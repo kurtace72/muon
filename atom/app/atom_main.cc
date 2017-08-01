@@ -21,25 +21,15 @@
 #include <shellscalingapi.h>
 #include <tchar.h>
 
-#include "base/environment.h"
+#include "base/debug/dump_without_crashing.h"
 #include "base/win/win_util.h"
+#include "chrome/common/chrome_constants.h"
 #include "chrome/install_static/install_details.h"
 #include "chrome/install_static/install_util.h"
 #include "chrome/install_static/product_install_details.h"
 #include "content/public/app/sandbox_helper_win.h"
 #include "sandbox/win/src/sandbox_types.h"
 #endif  // defined(OS_WIN)
-
-bool IsEnvSet(const char* name) {
-#if defined(OS_WIN)
-  size_t required_size;
-  getenv_s(&required_size, nullptr, 0, name);
-  return required_size != 0;
-#else
-  char* indicator = getenv(name);
-  return indicator && indicator[0] != '\0';
-#endif
-}
 
 #if defined(OS_MACOSX)
 extern "C" {
@@ -62,18 +52,30 @@ int main(int argc, const char* argv[]) {
 #endif  // OS_WIN
   int64_t exe_entry_point_ticks = 0;
 
+#if defined(OS_WIN)
+  install_static::InitializeProductDetailsForPrimaryModule();
+#endif
+
   atom::AtomMainDelegate chrome_main_delegate(
       base::TimeTicks::FromInternalValue(exe_entry_point_ticks));
   content::ContentMainParams params(&chrome_main_delegate);
 
 #if defined(OS_WIN)
-  install_static::InitializeProductDetailsForPrimaryModule();
-
   sandbox::SandboxInterfaceInfo sandbox_info = {0};
   content::InitializeSandboxInfo(&sandbox_info);
 
+  // The process should crash when going through abnormal termination.
   base::win::SetShouldCrashOnProcessDetach(true);
   base::win::SetAbortBehaviorForCrashReporting();
+  // SetDumpWithoutCrashingFunction must be passed the DumpProcess function
+  // from chrome_elf and not from the DLL in order for DumpWithoutCrashing to
+  // function correctly.
+  typedef void (__cdecl *DumpProcessFunction)();
+  DumpProcessFunction DumpProcess = reinterpret_cast<DumpProcessFunction>(
+      ::GetProcAddress(::GetModuleHandle(chrome::kChromeElfDllName),
+                       "DumpProcessWithoutCrash"));
+  CHECK(DumpProcess);
+  base::debug::SetDumpWithoutCrashingFunction(DumpProcess);
 
   params.instance = instance;
   params.sandbox_info = &sandbox_info;

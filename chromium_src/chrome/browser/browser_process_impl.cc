@@ -202,7 +202,6 @@ void BrowserProcessImpl::StartTearDown() {
   message_center::MessageCenter::Shutdown();
 
   if (local_state()) {
-    LOG(ERROR) << "commit pending writes";
     local_state()->CommitPendingWrite();
   }
 }
@@ -450,7 +449,6 @@ void BrowserProcessImpl::EndSession() {
   scoped_refptr<RundownTaskCounter> rundown_counter(new RundownTaskCounter());
   const bool pref_service_enabled =
       base::FeatureList::IsEnabled(features::kPrefService);
-  LOG(ERROR) << "pref_service_enabled " << pref_service_enabled;
   std::vector<scoped_refptr<base::SequencedTaskRunner>> profile_writer_runners;
   for (size_t i = 0; i < profiles.size(); ++i) {
     Profile* profile = profiles[i];

@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 
+#include "base/build_config.h"
 #include "base/callback.h"
 #include "base/command_line.h"
 #include "base/memory/memory_pressure_listener.h"
@@ -68,7 +69,7 @@ class AtomBrowserMainParts : public brightray::BrowserMainParts {
   void PostMainMessageLoopStart() override;
   void PostMainMessageLoopRun() override;
   void PostDestroyThreads() override;
-#if defined(OS_MACOSX)
+#if defined(OS_MACOSX) || defined(OS_WIN)
   void PreMainMessageLoopStart() override;
 #endif
 

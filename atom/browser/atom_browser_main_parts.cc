@@ -63,6 +63,12 @@
 #include "content/public/common/service_manager_connection.h"
 #include "services/service_manager/runner/common/client_util.h"
 
+#if defined(OS_WIN)
+#include "base/win/pe_image.h"
+#include "base/win/registry.h"
+#include "base/win/win_util.h"
+#include "base/win/windows_version.h"
+#include "base/win/wrapped_window_proc.h"
 #endif
 
 namespace atom {
@@ -75,6 +81,18 @@ OSStatus KeychainCallback(SecKeychainEvent keychain_event,
   return noErr;
 }
 #endif  // defined(OS_MACOSX)
+
+#if defined(OS_WIN)
+void InitializeWindowProcExceptions() {
+  // Get the breakpad pointer
+  base::win::WinProcExceptionFilter exception_filter =
+      reinterpret_cast<base::win::WinProcExceptionFilter>(::GetProcAddress(
+          ::GetModuleHandle(chrome::kChromeElfDllName), "CrashForException"));
+  CHECK(exception_filter);
+  exception_filter = base::win::SetWinProcExceptionFilter(exception_filter);
+  DCHECK(!exception_filter);
+}
+#endif  // defined (OS_WIN)
 
 }  // namespace
 
@@ -232,6 +250,15 @@ void AtomBrowserMainParts::OnMemoryPressure(
 
 void AtomBrowserMainParts::IdleHandler() {
   base::allocator::ReleaseFreeMemory();
+}
+
+#if defined(OS_WIN)
+void AtomBrowserMainParts::PreMainMessageLoopStart() {
+  brightray::BrowserMainParts::PreMainMessageLoopStart();
+  if (!parameters().ui_task) {
+    // Make sure that we know how to handle exceptions from the message loop.
+    InitializeWindowProcExceptions();
+  }
 }
 
 void AtomBrowserMainParts::PreMainMessageLoopRun() {

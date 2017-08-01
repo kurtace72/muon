@@ -15,4 +15,12 @@ source_set("app") {
     "//electron/chromium_src:browser",
     "//electron/chromium_src:app",
   ]
+
+  if (is_mac || is_win) {
+    deps += [
+      # TODO(bridiver) - add crashpad_handler.exe to win??
+      "//third_party/crashpad/crashpad/handler:crashpad_handler",
+      "//third_party/crashpad/crashpad/tools:crashpad_database_util",
+    ]
+  }
 }
