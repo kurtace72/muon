@@ -5,6 +5,7 @@
 #ifndef MUON_APP_MUON_CRASH_REPORTER_CLIENT_H_
 #define MUON_APP_MUON_CRASH_REPORTER_CLIENT_H_
 
+#include "build/build_config.h"
 #if defined(OS_WIN)
 #include "chrome/app/chrome_crash_reporter_client_win.h"
 #else
