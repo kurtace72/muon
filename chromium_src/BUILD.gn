@@ -34,13 +34,46 @@ config("chromium_src_config") {
   }
 }
 
-source_set("common") {
-  configs += [
-    ":chromium_src_config",
-    "//electron/build:electron_config",
+source_set("app") {
+  configs += [ "//electron/build:electron_config" ]
+  configs += [ ":chromium_src_config" ]
+
+  sources = []
+
+  if (is_win) {
+    sources += [
+      "//chrome/app/chrome_crash_reporter_client_win.cc",
+      "//chrome/app/chrome_crash_reporter_client_win.h",
+    ]
+  } else {
+    sources += [
+      "//chrome/app/chrome_crash_reporter_client.cc",
+      "//chrome/app/chrome_crash_reporter_client.h",
+      "//chrome/app/chrome_crash_reporter_client_mac.mm",
+    ]
+  }
+
+  deps = [
+    "//base",
+    "//chrome/common",
+    "//chrome/installer",
+    "//components/metrics",
+    "//components/crash/content/app",
+    "//components/crash/content/browser",
+    "//content/public/common",
   ]
 
-  ]
+  if (is_linux) {
+    deps += [
+      "//components/upload_list",
+      "//components/version_info",
+    ]
+  }
+}
+
+source_set("common") {
+  configs += [ "//electron/build:electron_config" ]
+  configs += [ ":chromium_src_config" ]
 
   sources = []
   deps = []
@@ -98,6 +131,7 @@ source_set("browser") {
 
   deps = [
     ":bookmarks",
+    ":crashes_ui",
     ":devtools",
     ":favicon",
     ":history",
@@ -175,6 +209,8 @@ source_set("browser") {
     "chrome/browser/ui/webui/chrome_web_ui_controller_factory.cc",
     "//chrome/browser/ui/webui/chrome_web_ui_controller_factory.h",
 
+    # "//chrome/browser/chrome_process_singleton.cc",
+    # "//chrome/browser/chrome_process_singleton.h",
     "//chrome/browser/process_singleton_posix.cc",
     "//chrome/browser/process_singleton_win.cc",
     "//chrome/browser/process_singleton.h",
@@ -453,6 +489,24 @@ source_set("browser") {
       deps += [ "//third_party/hunspell" ]
     }
   }
+}
+
+source_set("crashes_ui") {
+  configs += [ "//electron/build:electron_config" ]
+  configs += [ ":chromium_src_config" ]
+
+  sources = [
+    "//chrome/browser/ui/webui/crashes_ui.cc",
+    "//chrome/browser/ui/webui/crashes_ui.h",
+    "//chrome/browser/crash_upload_list/crash_upload_list.cc",
+    "//chrome/browser/crash_upload_list/crash_upload_list.h",
+  ]
+
+  deps = [
+    ":metrics",
+    ":sessions",
+    "//third_party/protobuf:protobuf_lite",
+  ]
 }
 
 source_set("menu_bar") {

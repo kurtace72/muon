@@ -1,0 +1,17 @@
+source_set("app") {
+  public_configs = [
+    "//electron/build:electron_config",
+  ]
+
+  sources = [
+    "muon_crash_reporter_client.cc",
+    "muon_crash_reporter_client.h",
+  ]
+
+  deps = [
+    "//components/metrics",
+    "//components/prefs",
+    "//electron/chromium_src:browser",
+    "//electron/chromium_src:app",
+  ]
+}

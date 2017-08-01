@@ -24,6 +24,8 @@ source_set("app") {
   }
 
   deps = [
+    "//chrome/child",
+    "//electron/muon/app",
     "//content/public/common:interfaces",
     "//content/public/common",
     "//components/rappor/public/interfaces",

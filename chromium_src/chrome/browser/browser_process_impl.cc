@@ -6,6 +6,7 @@
 
 #include "atom/browser/api/atom_api_app.h"
 #include "atom/browser/atom_resource_dispatcher_host_delegate.h"
+#include "base/base_switches.h"
 #include "base/command_line.h"
 #include "base/metrics/field_trial.h"
 #include "base/path_service.h"
@@ -17,12 +18,16 @@
 #include "brightray/browser/brightray_paths.h"
 #include "chrome/browser/background/background_mode_manager.h"
 #include "chrome/browser/browser_shutdown.h"
+#include "chrome/browser/prefs/chrome_command_line_pref_store.h"
 #include "chrome/browser/printing/print_job_manager.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/shell_integration.h"
 #include "chrome/browser/status_icons/status_tray.h"
+#include "chrome/common/chrome_features.h"
 #include "chrome/common/chrome_paths.h"
 #include "components/component_updater/component_updater_service.h"
+// #include "components/crash/content/app/crashpad.h"
+#include "components/metrics/metrics_pref_names.h"
 #include "components/password_manager/core/browser/password_manager.h"
 #include "components/prefs/json_pref_store.h"
 #include "components/prefs/pref_filter.h"
@@ -31,6 +36,8 @@
 #include "content/public/browser/child_process_security_policy.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/resource_dispatcher_host.h"
+#include "content/public/common/content_switches.h"
+#include "muon/app/muon_crash_reporter_client.h"
 #include "ppapi/features/features.h"
 #include "ui/base/idle/idle.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -41,6 +48,7 @@
 #include "chrome/browser/extensions/event_router_forwarder.h"
 #include "chrome/common/extensions/extension_process_policy.h"
 #include "chrome/common/extensions/chrome_extensions_client.h"
+#include "components/storage_monitor/storage_monitor.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/features/feature_provider.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -50,6 +58,23 @@
 #include "brave/browser/plugins/brave_plugin_service_filter.h"
 #include "chrome/browser/plugins/plugin_finder.h"
 #include "content/public/browser/plugin_service.h"
+#endif
+
+#if defined(OS_POSIX) && !defined(OS_MACOSX)
+#include "components/crash/content/app/breakpad_linux.h"
+#endif
+
+#if defined(OS_WIN)
+#include "components/crash/content/app/breakpad_win.h"
+#endif
+
+#if defined(USE_X11) || defined(OS_WIN) || defined(USE_OZONE)
+// How long to wait for the File thread to complete during EndSession, on Linux
+// and Windows. We have a timeout here because we're unable to run the UI
+// messageloop and there's some deadlock risk. Our only option is to exit
+// anyway.
+static constexpr base::TimeDelta kEndSessionTimeout =
+    base::TimeDelta::FromSeconds(10);
 #endif
 
 using content::ChildProcessSecurityPolicy;
@@ -156,7 +181,12 @@ message_center::MessageCenter* BrowserProcessImpl::message_center() {
 }
 
 void BrowserProcessImpl::StartTearDown() {
+  TRACE_EVENT0("shutdown", "BrowserProcessImpl::StartTearDown");
+  // TODO(crbug.com/560486): Fix the tests that make the check of
+  // |tearing_down_| necessary in IsShuttingDown().
   tearing_down_ = true;
+  DCHECK(IsShuttingDown());
+
   browser_shutdown::SetTryingToQuit(true);
 
   for (content::RenderProcessHost::iterator i(
@@ -170,6 +200,11 @@ void BrowserProcessImpl::StartTearDown() {
   profile_manager_.reset();
 
   message_center::MessageCenter::Shutdown();
+
+  if (local_state()) {
+    LOG(ERROR) << "commit pending writes";
+    local_state()->CommitPendingWrite();
+  }
 }
 
 void BrowserProcessImpl::SetApplicationLocale(const std::string& locale) {
@@ -194,9 +229,38 @@ void BrowserProcessImpl::CreateLocalState() {
   CHECK(PathService::Get(chrome::FILE_LOCAL_STATE, &local_state_path));
   scoped_refptr<PrefRegistrySimple> pref_registry = new PrefRegistrySimple;
 
+  // metrics::MetricsService::RegisterPrefs(registry);
+  // metrics::StabilityMetricsHelper::RegisterPrefs(registry);
+  // metrics::RegisterMetricsReportingStatePrefs(registry);
+
+// #if BUILDFLAG(ENABLE_PLUGINS)
+//   PluginMetricsProvider::RegisterPrefs(registry);
+// #endif  // BUILDFLAG(ENABLE_PLUGINS)
+//   browser_shutdown::RegisterPrefs(registry);
+  // variations::VariationsService::RegisterPrefs(registry);
+  // component_updater::RegisterPrefs(registry);
+  // ExternalProtocolHandler::RegisterPrefs(registry);
+  // geolocation::RegisterPrefs(registry);
+  // network_time::NetworkTimeTracker::RegisterPrefs(registry);
+  // ssl_config::SSLConfigServiceManager::RegisterPrefs(registry);
+  // subresource_filter::IndexedRulesetVersion::RegisterPrefs(registry);
+  // startup_metric_utils::RegisterPrefs(registry);
+  // update_client::RegisterPrefs(registry);
+
+// #if BUILDFLAG(ENABLE_PLUGINS)
+//   PluginFinder::RegisterPrefs(registry);
+//   PluginsResourceService::RegisterPrefs(registry);
+// #endif
+
+//   task_manager::TaskManagerInterface::RegisterPrefs(registry);
+//   gcm::GCMChannelStatusSyncer::RegisterPrefs(registry);
+//   gcm::RegisterPrefs(registry);
+
 #if defined(OS_WIN)
-    password_manager::PasswordManager::RegisterLocalPrefs(pref_registry.get());
+  password_manager::PasswordManager::RegisterLocalPrefs(pref_registry.get());
 #endif
+  pref_registry->RegisterBooleanPref(
+      metrics::prefs::kMetricsReportingEnabled, false);
 
   sync_preferences::PrefServiceSyncableFactory factory;
   factory.set_async(false);
@@ -235,22 +299,68 @@ void BrowserProcessImpl::PreCreateThreads() {
   ChildProcessSecurityPolicy::GetInstance()->RegisterWebSafeScheme(
       extensions::kExtensionScheme);
 #endif
+  auto command_line = base::CommandLine::ForCurrentProcess();
+
+  // initialize local state
+  local_state()->UpdateCommandLinePrefStore(
+      new ChromeCommandLinePrefStore(command_line));
 }
 
 void BrowserProcessImpl::PreMainMessageLoopRun() {
+  TRACE_EVENT0("startup", "BrowserProcessImpl::PreMainMessageLoopRun");
+
+  // TODO(bridiver) ??
+  // #if !defined(OS_ANDROID)
+  //   ApplyMetricsReportingPolicy();
+  // #endif
+
 #if BUILDFLAG(ENABLE_PLUGINS)
   PluginService* plugin_service = PluginService::GetInstance();
   plugin_service->SetFilter(BravePluginServiceFilter::GetInstance());
 
   // Triggers initialization of the singleton instance on UI thread.
   PluginFinder::GetInstance()->Init();
+
+  // TODO(bridiver) ??
+  // DCHECK(!plugins_resource_service_);
+  // plugins_resource_service_ =
+  //     base::MakeUnique<PluginsResourceService>(local_state());
+  // plugins_resource_service_->Init();
+
 #endif  // BUILDFLAG(ENABLE_PLUGINS)
+
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+  storage_monitor::StorageMonitor::Create();
+#endif
+
+  // TODO(bridiver) ??
+  // child_process_watcher_.reset(new ChromeChildProcessWatcher());
+
 
 // Start the tab manager here so that we give the most amount of time for the
 // other services to start up before we start adjusting the oom priority.
 #if defined(OS_WIN) || defined(OS_MACOSX) || defined(OS_LINUX)
   g_browser_process->GetTabManager()->Start();
 #endif
+}
+
+void BrowserProcessImpl::PostDestroyThreads() {
+  // With the file_thread_ flushed, we can release any icon resources.
+//   icon_manager_.reset();
+
+// #if BUILDFLAG(ENABLE_WEBRTC)
+//   // Must outlive the file thread.
+//   webrtc_log_uploader_.reset();
+// #endif
+
+  // Reset associated state right after actual thread is stopped,
+  // as io_thread_.global_ cleanup happens in CleanUp on the IO
+  // thread, i.e. as the thread exits its message loop.
+  //
+  // This is important also because in various places, the
+  // IOThread object being NULL is considered synonymous with the
+  // IO thread having stopped.
+  // io_thread_.reset();
 }
 
 memory::TabManager* BrowserProcessImpl::GetTabManager() {
@@ -264,9 +374,141 @@ memory::TabManager* BrowserProcessImpl::GetTabManager() {
 #endif
 }
 
-// NOTIMPLEMENTED
+namespace {
+
+// Used at the end of session to block the UI thread for completion of sentinel
+// tasks on the set of threads used to persist profile data and local state.
+// This is done to ensure that the data has been persisted to disk before
+// continuing.
+class RundownTaskCounter :
+    public base::RefCountedThreadSafe<RundownTaskCounter> {
+ public:
+  RundownTaskCounter();
+
+  // Posts a rundown task to |task_runner|, can be invoked an arbitrary number
+  // of times before calling TimedWait.
+  void Post(base::SequencedTaskRunner* task_runner);
+
+  // Waits until the count is zero or |end_time| is reached.
+  // This can only be called once per instance. Returns true if a count of zero
+  // is reached or false if the |end_time| is reached. It is valid to pass an
+  // |end_time| in the past.
+  bool TimedWaitUntil(const base::TimeTicks& end_time);
+
+ private:
+  friend class base::RefCountedThreadSafe<RundownTaskCounter>;
+  ~RundownTaskCounter() {}
+
+  // Decrements the counter and releases the waitable event on transition to
+  // zero.
+  void Decrement();
+
+  // The count starts at one to defer the possibility of one->zero transitions
+  // until TimedWait is called.
+  base::AtomicRefCount count_;
+  base::WaitableEvent waitable_event_;
+
+  DISALLOW_COPY_AND_ASSIGN(RundownTaskCounter);
+};
+
+RundownTaskCounter::RundownTaskCounter()
+    : count_(1),
+      waitable_event_(base::WaitableEvent::ResetPolicy::MANUAL,
+                      base::WaitableEvent::InitialState::NOT_SIGNALED) {}
+
+void RundownTaskCounter::Post(base::SequencedTaskRunner* task_runner) {
+  // As the count starts off at one, it should never get to zero unless
+  // TimedWait has been called.
+  DCHECK(!base::AtomicRefCountIsZero(&count_));
+
+  base::AtomicRefCountInc(&count_);
+
+  // The task must be non-nestable to guarantee that it runs after all tasks
+  // currently scheduled on |task_runner| have completed.
+  task_runner->PostNonNestableTask(
+      FROM_HERE, base::BindOnce(&RundownTaskCounter::Decrement, this));
+}
+
+void RundownTaskCounter::Decrement() {
+  if (!base::AtomicRefCountDec(&count_))
+    waitable_event_.Signal();
+}
+
+bool RundownTaskCounter::TimedWaitUntil(const base::TimeTicks& end_time) {
+  // Decrement the excess count from the constructor.
+  Decrement();
+
+  return waitable_event_.TimedWaitUntil(end_time);
+}
+
+}  // namespace
+
 void BrowserProcessImpl::EndSession() {
+  // Mark all the profiles as clean.
+  ProfileManager* pm = profile_manager();
+  std::vector<Profile*> profiles(pm->GetLoadedProfiles());
+  scoped_refptr<RundownTaskCounter> rundown_counter(new RundownTaskCounter());
+  const bool pref_service_enabled =
+      base::FeatureList::IsEnabled(features::kPrefService);
+  LOG(ERROR) << "pref_service_enabled " << pref_service_enabled;
+  std::vector<scoped_refptr<base::SequencedTaskRunner>> profile_writer_runners;
+  for (size_t i = 0; i < profiles.size(); ++i) {
+    Profile* profile = profiles[i];
+    profile->SetExitType(Profile::EXIT_SESSION_ENDED);
+    if (profile->GetPrefs()) {
+      profile->GetPrefs()->CommitPendingWrite();
+      if (pref_service_enabled) {
+        rundown_counter->Post(content::BrowserThread::GetTaskRunnerForThread(
+                                  content::BrowserThread::IO)
+                                  .get());
+        profile_writer_runners.push_back(profile->GetIOTaskRunner());
+      } else {
+        rundown_counter->Post(profile->GetIOTaskRunner().get());
+      }
+    }
+  }
+
+  if (local_state()) {
+    local_state()->CommitPendingWrite();
+    rundown_counter->Post(local_state_task_runner_.get());
+  }
+
+  // http://crbug.com/125207
+  base::ThreadRestrictions::ScopedAllowWait allow_wait;
+
+  // We must write that the profile and metrics service shutdown cleanly,
+  // otherwise on startup we'll think we crashed. So we block until done and
+  // then proceed with normal shutdown.
+  //
+  // If you change the condition here, be sure to also change
+  // ProfileBrowserTests to match.
+#if defined(USE_X11) || defined(OS_WIN) || defined(USE_OZONE)
+  // Do a best-effort wait on the successful countdown of rundown tasks. Note
+  // that if we don't complete "quickly enough", Windows will terminate our
+  // process.
+  //
+  // On Windows, we previously posted a message to FILE and then ran a nested
+  // message loop, waiting for that message to be processed until quitting.
+  // However, doing so means that other messages will also be processed. In
+  // particular, if the GPU process host notices that the GPU has been killed
+  // during shutdown, it races exiting the nested loop with the process host
+  // blocking the message loop attempting to re-establish a connection to the
+  // GPU process synchronously. Because the system may not be allowing
+  // processes to launch, this can result in a hang. See
+  // http://crbug.com/318527.
+  const base::TimeTicks end_time = base::TimeTicks::Now() + kEndSessionTimeout;
+  const bool timed_out = !rundown_counter->TimedWaitUntil(end_time);
+  if (timed_out || !pref_service_enabled)
+    return;
+
+  scoped_refptr<RundownTaskCounter> profile_write_rundown_counter(
+      new RundownTaskCounter());
+  for (auto& profile_writer_runner : profile_writer_runners)
+    profile_write_rundown_counter->Post(profile_writer_runner.get());
+  profile_write_rundown_counter->TimedWaitUntil(end_time);
+#else
   NOTIMPLEMENTED();
+#endif
 }
 
 net_log::ChromeNetLog* BrowserProcessImpl::net_log() {

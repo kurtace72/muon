@@ -254,8 +254,8 @@ void AtomBrowserClient::GetAdditionalAllowedSchemesForFileSystem(
 }
 
 brightray::BrowserMainParts* AtomBrowserClient::OverrideCreateBrowserMainParts(
-    const content::MainFunctionParams&) {
-  return new AtomBrowserMainParts;
+    const content::MainFunctionParams& params) {
+  return new AtomBrowserMainParts(params);
 }
 
 void AtomBrowserClient::WebNotificationAllowed(

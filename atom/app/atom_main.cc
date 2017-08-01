@@ -52,10 +52,6 @@ int ChromeMain(int argc, const char* argv[]);
 int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, wchar_t* cmd, int) {
   int argc = 0;
   wchar_t** argv_setup = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
-
-  if (IsEnvSet("ELECTRON_INTERNAL_CRASH_SERVICE")) {
-    return crash_service::Main(cmd);
-  }
 #else  // OS_WIN
 #if defined(OS_MACOSX)
 int ChromeMain(int argc, const char* argv[]) {

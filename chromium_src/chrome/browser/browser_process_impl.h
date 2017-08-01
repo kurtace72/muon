@@ -64,6 +64,8 @@ class BrowserProcessImpl : public BrowserProcess {
 
   void PreCreateThreads();
   void PreMainMessageLoopRun();
+  void PostDestroyThreads();
+
   const std::string& GetApplicationLocale() override;
 
   printing::PrintJobManager* print_job_manager() override;

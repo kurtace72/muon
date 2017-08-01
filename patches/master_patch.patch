@@ -953,6 +953,82 @@ index 257467a99132986f56d3ce098515afab24db7941..d8135a059b8621dbe925574b80645221
    // chrome::mojom::ProfileImport:
    void StartImport(const importer::SourceProfile& source_profile,
                     uint16_t items,
+diff --git a/components/crash/content/app/breakpad_linux.cc b/components/crash/content/app/breakpad_linux.cc
+index 0d3de65043a0b66fc1d3bc8fee578ae13179f611..93f10e5a838098c125a709b0939bf223897024b0 100644
+--- a/components/crash/content/app/breakpad_linux.cc
++++ b/components/crash/content/app/breakpad_linux.cc
+@@ -87,8 +87,10 @@ namespace breakpad {
+ 
+ namespace {
+ 
+-#if !defined(OS_CHROMEOS)
++#if !defined(OS_CHROMEOS) && defined(MUON_CHROMIUM_BUILD)
+ const char kUploadURL[] = "https://clients2.google.com/cr/report";
++#else
++const char kUploadURL[] = "https://laptop-updates.brave.com/1/crashes";
+ #endif
+ 
+ bool g_is_crash_reporter_enabled = false;
+@@ -1358,6 +1360,7 @@ void ExecUploadProcessOrTerminate(const BreakpadInfo& info,
+     header_content_type,
+     post_file,
+     kUploadURL,
++    "--quiet",
+     "--timeout=10",  // Set a timeout so we don't hang forever.
+     "--tries=1",     // Don't retry if the upload fails.
+     "-O",  // Output reply to the file descriptor path.
+@@ -1411,6 +1414,9 @@ size_t WaitForCrashReportUploadProcess(int fd, size_t bytes_to_read,
+ // |buf| should be |expected_len| + 1 characters in size and nullptr terminated.
+ bool IsValidCrashReportId(const char* buf, size_t bytes_read,
+                           size_t expected_len) {
++#if !defined(MUON_CHROMIUM_BUILD)
++  return my_strcmp(buf, "OK") == 0;
++#endif
+   if (bytes_read != expected_len) {
+     static const char msg[] = "Unexpected crash report id length\n";
+     WriteLog(msg, sizeof(msg) - 1);
+@@ -1883,8 +1889,11 @@ void HandleCrashDump(const BreakpadInfo& info) {
+       // Helper process.
+       if (upload_child > 0) {
+         IGNORE_RET(sys_close(fds[1]));  // Close write end of pipe.
+-
++#if defined(MUON_CHROMIUM_BUILD)
+         const size_t kCrashIdLength = 16;
++#else
++        const size_t kCrashIdLength = 2;
++#endif
+         char id_buf[kCrashIdLength + 1];
+         size_t bytes_read =
+             WaitForCrashReportUploadProcess(fds[0], kCrashIdLength, id_buf);
+diff --git a/components/crash/content/app/crashpad_mac.mm b/components/crash/content/app/crashpad_mac.mm
+index 485c2b4b3e98244f6303c92394dd0f6eab7263c6..fab01cb6f7cac899dc0ae475feeebe518485609a 100644
+--- a/components/crash/content/app/crashpad_mac.mm
++++ b/components/crash/content/app/crashpad_mac.mm
+@@ -55,6 +55,8 @@ base::FilePath PlatformCrashpadInitialization(
+       // Only allow the possibility of report upload in official builds. This
+       // crash server won't have symbols for any other build types.
+       std::string url = "https://clients2.google.com/cr/report";
++#elif !defined(MUON_CHROMIUM_BUILD)
++      std::string url = "https://brave-laptop-updates.herokuapp.com/1/crashes";
+ #else
+       std::string url;
+ #endif
+diff --git a/components/crash/core/browser/resources/crashes.js b/components/crash/core/browser/resources/crashes.js
+index dbd2ae8df59756c61d28091cff70098c897db8f4..84fbc695c817c87deb902d8b6f69d3f1ec762ccb 100644
+--- a/components/crash/core/browser/resources/crashes.js
++++ b/components/crash/core/browser/resources/crashes.js
+@@ -105,9 +105,9 @@ function updateCrashList(
+         // https://bugs.chromium.org/p/monorail/issues/detail?id=1488 is done.
+         labels: 'Restrict-View-EditIssue,Stability-Crash,User-Submitted',
+       };
+-      var href = 'https://code.google.com/p/chromium/issues/entry';
++      var href = 'https://github.com/brave/browser-laptop/issues/new';
+       for (var param in params) {
+-        href = appendParam(href, param, params[param]);
++        // href = appendParam(href, param, params[param]);
+       }
+       link.href = href;
+       link.target = '_blank';
 diff --git a/components/guest_view/browser/guest_view_base.cc b/components/guest_view/browser/guest_view_base.cc
 index 27570202e8e5cca632e560fe5b22920aeb2c5742..3ac3b8c7b81c095b3b2264ff18431852de060a1b 100644
 --- a/components/guest_view/browser/guest_view_base.cc
@@ -1049,6 +1125,19 @@ index ea034fd48c08de6f5f755fbffb962390ec8dd7b2..ae6d1fcf40d24c89941e1717c3069825
    attrs.Append("application", kApplicationName);
    GList* search_results = LibsecretLoader::secret_service_search_sync(
        nullptr /* default secret service */, &kKeystoreSchemaV2, attrs.Get(),
+diff --git a/components/metrics/metrics_service_accessor.cc b/components/metrics/metrics_service_accessor.cc
+index 29b67bd911888a5eedd2d244fbe70aac27899987..918d36ce52cebc97fcf3f952979362c31af70dbd 100644
+--- a/components/metrics/metrics_service_accessor.cc
++++ b/components/metrics/metrics_service_accessor.cc
+@@ -16,7 +16,7 @@ namespace metrics {
+ // static
+ bool MetricsServiceAccessor::IsMetricsReportingEnabled(
+     PrefService* pref_service) {
+-#if defined(GOOGLE_CHROME_BUILD)
++#if defined(GOOGLE_CHROME_BUILD) || !defined(MUON_CHROMIUM_BUILD)
+   // In official builds, disable metrics when reporting field trials are
+   // forced; otherwise, use the value of the user's preference to determine
+   // whether to enable metrics reporting.
 diff --git a/components/os_crypt/keychain_password_mac.mm b/components/os_crypt/keychain_password_mac.mm
 index 2b38db266f9aa1f4141c8649c021042ede4e5589..ea0387b11f4b00f87596d738c152aa4cc43b2beb 100644
 --- a/components/os_crypt/keychain_password_mac.mm
@@ -1986,6 +2075,24 @@ index bf0ece1e723ba1a0644961cfd3a01ce3c14c892a..5e7d3dbb9da51a5abb0447bc04c90c9b
                                    HolderIsFirstArgument);
    }
    static void SetAsFunctionHandler(v8::Isolate* isolate,
+diff --git a/net/BUILD.gn b/net/BUILD.gn
+index 62145ac928a694a37cb9fe0e3f48e6cd3ea0b434..e80c04cdeb668d7bb979edd157b9bff45a7bc15e 100644
+--- a/net/BUILD.gn
++++ b/net/BUILD.gn
+@@ -62,10 +62,12 @@ config("net_internal_config") {
+     "NET_IMPLEMENTATION",
+   ]
+ 
++  include_dirs = [ "$root_gen_dir" ]
++
+   if (use_kerberos) {
+     defines += [ "USE_KERBEROS" ]
+     if (is_android) {
+-      include_dirs = [ "/usr/include/kerberosV" ]
++      include_dirs += [ "/usr/include/kerberosV" ]
+     }
+   }
+ 
 diff --git a/net/http/http_util.cc b/net/http/http_util.cc
 index 95ba606a7e0fa239a9c8c62f19591ec6bb39097a..b4fece0421b282f4042250108426eb502ff9b4c9 100644
 --- a/net/http/http_util.cc
@@ -2113,6 +2220,22 @@ index ef900bce6a8ae8500611ca76c1898d71c349f081..bde0cd50d24289981e99d47a5f3fc552
  
  # Windows' assembly is built with Yasm. The other platforms use the platform
  # assembler.
+diff --git a/third_party/crashpad/crashpad/handler/crash_report_upload_thread.cc b/third_party/crashpad/crashpad/handler/crash_report_upload_thread.cc
+index d77cdbadc482ab5bee13e1026869bc9f52c415a3..561ac592c7ac0498f6d82a61d8fe621281f760a3 100644
+--- a/third_party/crashpad/crashpad/handler/crash_report_upload_thread.cc
++++ b/third_party/crashpad/crashpad/handler/crash_report_upload_thread.cc
+@@ -268,7 +268,11 @@ void CrashReportUploadThread::ProcessPendingReport(
+         // If the most recent upload attempt occurred within the past hour,
+         // don’t attempt to upload the new report. If it happened longer ago,
+         // attempt to upload the report.
++#if defined(MUON_CHROMIUM_BUILD)
+         const int kUploadAttemptIntervalSeconds = 60 * 60;  // 1 hour
++#else
++        const int kUploadAttemptIntervalSeconds = 1 * 60;  // 1 min
++#endif
+         if (now - last_upload_attempt_time < kUploadAttemptIntervalSeconds) {
+           database_->SkipReportUpload(
+               report.uuid, Metrics::CrashSkippedReason::kUploadThrottled);
 diff --git a/third_party/widevine/cdm/BUILD.gn b/third_party/widevine/cdm/BUILD.gn
 index 9e744b9940e2c79366fae21f5652ee0fce830637..143385a2831ca5221a68b99bba65dc2927a241ac 100644
 --- a/third_party/widevine/cdm/BUILD.gn
