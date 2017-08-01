@@ -60,7 +60,6 @@
 #include "extensions/browser/extension_pref_value_map_factory.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_protocols.h"
-#include "extensions/browser/extension_system.h"
 #include "extensions/browser/extensions_browser_client.h"
 #endif
 
@@ -72,25 +71,56 @@
 using content::BrowserThread;
 using content::HostZoomMap;
 
-#if BUILDFLAG(ENABLE_EXTENSIONS)
+namespace brave {
+
 namespace {
 
+const char kPrefExitTypeCrashed[] = "Crashed";
+const char kPrefExitTypeSessionEnded[] = "SessionEnded";
+const char kPrefExitTypeNormal[] = "Normal";
+
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+// WATCH(bridiver) - chrome/browser/profiles/off_the_record_profile_impl.cc
 void NotifyOTRProfileCreatedOnIOThread(void* original_profile,
                                        void* otr_profile) {
   extensions::ExtensionWebRequestEventRouter::GetInstance()
       ->OnOTRBrowserContextCreated(original_profile, otr_profile);
 }
 
+// WATCH(bridiver) - chrome/browser/profiles/off_the_record_profile_impl.cc
 void NotifyOTRProfileDestroyedOnIOThread(void* original_profile,
                                          void* otr_profile) {
   extensions::ExtensionWebRequestEventRouter::GetInstance()
       ->OnOTRBrowserContextDestroyed(original_profile, otr_profile);
 }
-
-}  // namespace
 #endif
 
-namespace brave {
+// WATCH(bridiver) - chrome/browser/profiles/profile_impl.cc
+// Converts the kSessionExitedCleanly pref to the corresponding EXIT_TYPE.
+Profile::ExitType SessionTypePrefValueToExitType(const std::string& value) {
+  if (value == kPrefExitTypeSessionEnded)
+    return Profile::EXIT_SESSION_ENDED;
+  if (value == kPrefExitTypeCrashed)
+    return Profile::EXIT_CRASHED;
+  return Profile::EXIT_NORMAL;
+}
+
+// WATCH(bridiver) - chrome/browser/profiles/profile_impl.cc
+// Converts an ExitType into a string that is written to prefs.
+std::string ExitTypeToSessionTypePrefValue(Profile::ExitType type) {
+  switch (type) {
+    case Profile::EXIT_NORMAL:
+        return kPrefExitTypeNormal;
+    case Profile::EXIT_SESSION_ENDED:
+      return kPrefExitTypeSessionEnded;
+    case Profile::EXIT_CRASHED:
+      return kPrefExitTypeCrashed;
+  }
+  NOTREACHED();
+  return std::string();
+}
+
+}  // namespace
 
 const char kPersistPrefix[] = "persist:";
 const int kPersistPrefixLength = 8;
@@ -117,7 +147,8 @@ BraveBrowserContext::BraveBrowserContext(const std::string& partition,
       partition_(partition),
       ready_(
         new base::WaitableEvent(base::WaitableEvent::ResetPolicy::MANUAL,
-                            base::WaitableEvent::InitialState::NOT_SIGNALED)) {
+                            base::WaitableEvent::InitialState::NOT_SIGNALED)),
+      delegate_(g_browser_process->profile_manager()) {
   std::string parent_partition;
   if (options.GetString("parent_partition", &parent_partition)) {
     has_parent_ = true;
@@ -461,9 +492,6 @@ void BraveBrowserContext::OnPrefsLoaded(bool success) {
           ->CreateJobInterceptorFactory();
 
   if (!IsOffTheRecord() && !HasParentContext()) {
-#if BUILDFLAG(ENABLE_EXTENSIONS)
-    extensions::ExtensionSystem::Get(this)->InitForRegularProfile(true);
-#endif
     content::BrowserContext::GetDefaultStoragePartition(this)->
         GetDOMStorageContext()->SetSaveSessionStorageOnDisk();
 
@@ -501,10 +529,17 @@ void BraveBrowserContext::OnPrefsLoaded(bool success) {
 #endif
 
   ready_->Signal();
+
+  if (delegate_) {
+    TRACE_EVENT0("browser", "ProfileImpl::OnPrefsLoaded:DelegateOnProfileCreated")
+    delegate_->OnProfileCreated(this, true, IsNewProfile());
+  }
+
   content::NotificationService::current()->Notify(
       chrome::NOTIFICATION_PROFILE_CREATED,
       content::Source<BraveBrowserContext>(this),
       content::NotificationService::NoDetails());
+
 }
 
 content::ResourceContext* BraveBrowserContext::GetResourceContext() {
@@ -562,6 +597,26 @@ atom::AtomBrowserContext* BraveBrowserContext::FromPartition(
     return atom::AtomBrowserContext::From(
         partition == "default" ? "" : partition, true, options);
   }
+}
+
+// WATCH(bridiver) - chrome/browser/profiles/profile_impl.cc
+void BraveBrowserContext::SetExitType(ExitType exit_type) {
+  if (!user_prefs_)
+    return;
+  ExitType current_exit_type = SessionTypePrefValueToExitType(
+      user_prefs_->GetString(prefs::kSessionExitType));
+  // This may be invoked multiple times during shutdown. Only persist the value
+  // first passed in (unless it's a reset to the crash state, which happens when
+  // foregrounding the app on mobile).
+  if (exit_type == EXIT_CRASHED || current_exit_type == EXIT_CRASHED) {
+    user_prefs_->SetString(prefs::kSessionExitType,
+                      ExitTypeToSessionTypePrefValue(exit_type));
+  }
+}
+
+scoped_refptr<base::SequencedTaskRunner> BraveBrowserContext::GetIOTaskRunner() {
+  return JsonPrefStore::GetTaskRunnerForFile(
+      GetPath(), BrowserThread::GetBlockingPool());
 }
 
 }  // namespace brave
@@ -631,12 +686,6 @@ AtomBrowserContext* AtomBrowserContext::From(
 
   auto profile = new brave::BraveBrowserContext(partition, in_memory, options,
       sequenced_task_runner);
-
-  if (!profile->IsOffTheRecord() &&
-      !g_browser_process->profile_manager()->GetProfileByPath(
-          profile->GetPath())) {
-    g_browser_process->profile_manager()->AddProfile(profile);
-  }
 
   return profile;
 }

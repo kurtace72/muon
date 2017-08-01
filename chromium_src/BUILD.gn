@@ -101,31 +101,41 @@ source_set("browser") {
     ":devtools",
     ":favicon",
     ":history",
+    ":metrics",
     ":password_manager",
-    "chrome/browser/safe_browsing",
     ":sessions",
     ":web_data",
+    "chrome/browser/safe_browsing",
     "//electron/brave/browser:tab_manager",
     "//chrome/common",
     "//chrome/utility",
     "//components/certificate_transparency",
+    "//components/crash/content/app",
     "//components/data_usage/core",
     "//components/prefs",
     "//components/ssl_config",
     "//components/spellcheck:build_features",
+    "//components/storage_monitor",
     "//content/public/browser",
     "//electron/atom/browser",
   ]
 
   sources = [
+    "chrome/browser/about_flags.cc",
+    "//chrome/browser/about_flags.h",
     "//chrome/browser/browser_process.cc",
     "//chrome/browser/browser_process.h",
     "chrome/browser/browser_process_impl.cc",
     "chrome/browser/browser_process_impl.h",
-    "chrome/browser/browser_shutdown.cc",
-    "chrome/browser/chrome_notification_types.h",
+    "//chrome/browser/browser_shutdown.cc",
+    "//chrome/browser/chrome_notification_types.h",
     "chrome/browser/custom_handlers/protocol_handler_registry.cc",
+    "//chrome/browser/custom_handlers/protocol_handler_registry.h",
     "//chrome/browser/custom_handlers/protocol_handler_registry_factory.cc",
+    "//chrome/browser/custom_handlers/protocol_handler_registry_factory.h",
+
+    "chrome/browser/background/background_mode_manager.cc",
+    "//chrome/browser/background/background_mode_manager.h",
 
     # extensions
     "//chrome/browser/extensions/global_shortcut_listener.cc",
@@ -135,6 +145,11 @@ source_set("browser") {
     "//chrome/browser/extensions/global_shortcut_listener_win.cc",
     "//chrome/browser/extensions/global_shortcut_listener_win.h",
 
+    "chrome/browser/first_run/first_run.cc",
+    "//chrome/browser/first_run/first_run.h",
+    "//chrome/browser/first_run/upgrade_util.h",
+    "chrome/browser/first_run/upgrade_util.cc",
+
     "//chrome/browser/lifetime/keep_alive_registry.cc",
     "//chrome/browser/lifetime/keep_alive_registry.h",
     "//chrome/browser/lifetime/keep_alive_types.cc",
@@ -142,10 +157,8 @@ source_set("browser") {
     "//chrome/browser/lifetime/scoped_keep_alive.cc",
     "//chrome/browser/lifetime/scoped_keep_alive.h",
 
-    "chrome/browser/media/webrtc/media_capture_devices_dispatcher.cc",
-    "chrome/browser/media/webrtc/media_capture_devices_dispatcher.h",
-    "chrome/browser/media/webrtc/media_stream_capture_indicator.cc",
-    "chrome/browser/media/webrtc/media_stream_capture_indicator.h",
+    "//chrome/browser/prefs/chrome_command_line_pref_store.cc",
+    "//chrome/browser/prefs/chrome_command_line_pref_store.h",
 
     "//chrome/browser/site_details.cc",
     "//chrome/browser/site_details.h",
@@ -154,7 +167,7 @@ source_set("browser") {
     "//chrome/browser/ui/browser_list.cc",
     "//chrome/browser/ui/browser_list.h",
     "chrome/browser/ui/browser.cc",
-    "chrome/browser/ui/browser.h",
+    "//chrome/browser/ui/browser.h",
     "chrome/browser/ui/browser_otr_state.cc",
 
     "chrome/browser/ui/profile_error_dialog.cc",
@@ -177,7 +190,7 @@ source_set("browser") {
     "//chrome/browser/speech/tts_platform.cc",
     "//chrome/browser/speech/tts_platform.h",
     "//chrome/browser/speech/tts_win.cc",
-    "chrome/browser/ui/browser_dialogs.h",
+    "//chrome/browser/ui/browser_dialogs.h",
     "chrome/browser/ui/simple_message_box.cc",
     "//chrome/browser/ui/cocoa/color_chooser_mac.mm",
     "//chrome/browser/ui/zoom/chrome_zoom_level_prefs.cc",
@@ -217,8 +230,22 @@ source_set("browser") {
     "//chrome/browser/cache_stats_recorder.h",
   ]
 
+  if (is_win || is_mac) {
+    sources += [
+      "//chrome/browser/crash_upload_list/crash_upload_list_crashpad.cc",
+      "//chrome/browser/crash_upload_list/crash_upload_list_crashpad.h",
+    ]
+  }
+
+  deps += [
+    "//components/crash/content/app",
+    "//components/crash/core/browser",
+  ]
+
   if (is_win) {
     sources += [
+      "//chrome/browser/win/browser_util.h",
+      "//chrome/browser/win/browser_util.cc",
       "//chrome/browser/platform_util_aura.cc",
       "//chrome/browser/ui/views/color_chooser_dialog.cc",
       "//chrome/browser/ui/views/color_chooser_dialog.h",
@@ -286,6 +313,10 @@ source_set("browser") {
 
   if (enable_webrtc) {
     sources += [
+      "chrome/browser/media/webrtc/media_capture_devices_dispatcher.cc",
+      "chrome/browser/media/webrtc/media_capture_devices_dispatcher.h",
+      "chrome/browser/media/webrtc/media_stream_capture_indicator.cc",
+      "chrome/browser/media/webrtc/media_stream_capture_indicator.h",
       "chrome/browser/media/webrtc/desktop_media_list.h",
       "chrome/browser/media/webrtc/desktop_media_list_observer.h",
       "chrome/browser/media/webrtc/native_desktop_media_list.cc",
@@ -510,8 +541,6 @@ source_set("importer") {
     "//chrome/browser/importer/in_process_importer_bridge.h",
     "//chrome/browser/importer/profile_writer.cc",
     "//chrome/browser/importer/profile_writer.h",
-    "chrome/browser/first_run/first_run.cc",
-    "//chrome/browser/first_run/first_run.h",
   ]
 
   deps = [
@@ -601,7 +630,6 @@ source_set("password_manager") {
   configs += [ ":chromium_src_config" ]
 
   if (is_win) {
-    all_dependent_configs = [ "//chrome/browser:browser_win_linker_flags" ]
   }
 
   sources = [
@@ -695,6 +723,30 @@ source_set("favicon") {
   ]
 }
 
+source_set("metrics") {
+  configs += [ "//electron/build:electron_config" ]
+  configs += [ ":chromium_src_config" ]
+
+  sources = [
+    "//chrome/browser/metrics/chrome_metrics_service_accessor.cc",
+    "//chrome/browser/metrics/chrome_metrics_service_accessor.h",
+    "//chrome/browser/metrics/metrics_reporting_state.cc",
+    "//chrome/browser/metrics/metrics_reporting_state.h",
+    "//chrome/browser/metrics/thread_watcher.cc",
+    "//chrome/browser/metrics/thread_watcher.h",
+    "//chrome/browser/metrics/thread_watcher_report_hang.cc",
+    "//chrome/browser/metrics/thread_watcher_report_hang.h",
+  ]
+
+  deps = [
+    "//base",
+    "//chrome/common",
+    "//components/metrics",
+    "//components/version_info",
+    "//content/public/browser",
+  ]
+}
+
 source_set("search") {
   configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
@@ -735,6 +787,40 @@ source_set("history") {
   ]
 }
 
+source_set("lifetime") {
+  configs += [ "//electron/build:electron_config" ]
+  configs += [ ":chromium_src_config" ]
+
+  sources = [
+    "//chrome/browser/lifetime/termination_notification.cc",
+    "//chrome/browser/lifetime/termination_notification.h",
+    "//chrome/browser/lifetime/application_lifetime.cc",
+    "//chrome/browser/lifetime/application_lifetime.h",
+    "//chrome/browser/lifetime/application_lifetime_mac.mm",
+  ]
+
+  if (use_aura) {
+    sources += [
+      "//chrome/browser/lifetime/application_lifetime_aura.cc",
+    ]
+  }
+
+  deps = [
+    "//base",
+    ":sessions",
+    "//chrome/common",
+    "//components/metrics",
+    "//components/prefs",
+    "//content/public/browser",
+  ]
+
+  if (is_win) {
+    deps += [
+      ":metrics",
+    ]
+  }
+}
+
 source_set("tab_manager") {
   configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
@@ -746,7 +832,6 @@ source_set("tab_manager") {
     "//chrome/browser/engagement/site_engagement_score.cc",
     "//chrome/browser/engagement/site_engagement_score.h",
     "chrome/browser/engagement/site_engagement_service.cc",
-    "chrome/browser/lifetime/application_lifetime.cc",
     "//chrome/browser/memory/oom_memory_details.cc",
     "//chrome/browser/memory/oom_memory_details.h",
     "//chrome/browser/memory/tab_manager.cc",
@@ -774,6 +859,10 @@ source_set("tab_manager") {
     "//chrome/common",
     "//third_party/WebKit/public:blink_headers",
   ]
+
+  deps = [
+    ":lifetime",
+  ]
 }
 
 source_set("sessions") {
@@ -786,11 +875,13 @@ source_set("sessions") {
     "chrome/browser/profiles/profile.cc",
     "chrome/browser/profiles/profile.h",
     "chrome/browser/profiles/profile_io_data.cc",
-    "chrome/browser/profiles/profile_io_data.h",
+    "//chrome/browser/profiles/profile_io_data.h",
     "chrome/browser/profiles/profile_manager.cc",
-    "chrome/browser/profiles/profile_manager.h",
+    "//chrome/browser/profiles/profile_manager.h",
+    "chrome/browser/profiles/profile_metrics.cc",
+    "//chrome/browser/profiles/profile_metrics.h",
     "chrome/browser/profiles/profiles_state.cc",
-    "chrome/browser/profiles/profiles_state.h",
+    "//chrome/browser/profiles/profiles_state.h",
     "//chrome/browser/sessions/session_tab_helper.cc",
     "//chrome/browser/sessions/session_tab_helper.h",
     "//chrome/browser/profiles/sql_init_error_message_ids.cc",

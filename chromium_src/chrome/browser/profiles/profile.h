@@ -49,6 +49,53 @@ class PrefChangeRegistrar;
 // http://dev.chromium.org/developers/design-documents/profile-architecture
 class Profile : public atom::AtomBrowserContext {
  public:
+  enum CreateStatus {
+    // Profile services were not created due to a local error (e.g., disk full).
+    CREATE_STATUS_LOCAL_FAIL,
+    // Profile services were not created due to a remote error (e.g., network
+    // down during limited-user registration).
+    CREATE_STATUS_REMOTE_FAIL,
+    // Profile created but before initializing extensions and promo resources.
+    CREATE_STATUS_CREATED,
+    // Profile is created, extensions and promo resources are initialized.
+    CREATE_STATUS_INITIALIZED,
+    // Profile creation (supervised-user registration, generally) was canceled
+    // by the user.
+    CREATE_STATUS_CANCELED,
+    MAX_CREATE_STATUS  // For histogram display.
+  };
+
+  enum CreateMode {
+    CREATE_MODE_SYNCHRONOUS,
+    CREATE_MODE_ASYNCHRONOUS
+  };
+
+  enum ExitType {
+    // A normal shutdown. The user clicked exit/closed last window of the
+    // profile.
+    EXIT_NORMAL,
+
+    // The exit was the result of the system shutting down.
+    EXIT_SESSION_ENDED,
+
+    EXIT_CRASHED,
+  };
+
+  enum ProfileType {
+    REGULAR_PROFILE,  // Login user's normal profile
+    INCOGNITO_PROFILE,  // Login user's off-the-record profile
+    GUEST_PROFILE,  // Guest session's profile
+  };
+
+  class Delegate {
+   public:
+    virtual ~Delegate();
+
+    // Called when creation of the profile is finished.
+    virtual void OnProfileCreated(Profile* profile,
+                                  bool success,
+                                  bool is_new_profile) = 0;
+  };
 
   Profile(const std::string& partition, bool in_memory,
                      const base::DictionaryValue& options);
@@ -116,6 +163,13 @@ class Profile : public atom::AtomBrowserContext {
 
   virtual DevToolsNetworkControllerHandle*
   GetDevToolsNetworkControllerHandle() = 0;
+
+  bool IsNewProfile();
+  virtual void SetExitType(ExitType exit_type) = 0;
+
+  // Returns sequenced task runner where browser context dependent I/O
+  // operations should be performed.
+  virtual scoped_refptr<base::SequencedTaskRunner> GetIOTaskRunner() = 0;
 
  private:
   // bool restored_last_session_;

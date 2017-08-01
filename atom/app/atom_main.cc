@@ -21,7 +21,6 @@
 #include <shellscalingapi.h>
 #include <tchar.h>
 
-#include "atom/common/crash_reporter/win/crash_service_main.h"
 #include "base/environment.h"
 #include "base/win/win_util.h"
 #include "chrome/install_static/install_details.h"
