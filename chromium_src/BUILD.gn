@@ -53,6 +53,11 @@ source_set("app") {
     ]
   }
 
+  public_deps = [
+    "//components/crash/content/app",
+    "//components/crash/content/browser",
+  ]
+
   deps = [
     "//base",
     "//chrome/common",
@@ -706,9 +711,12 @@ source_set("password_manager") {
   ]
 
   deps = [
+    "//base",
     "//components/password_manager/content/browser",
     "//components/password_manager/core/browser",
     "//components/password_manager/core/common",
+    "//components/prefs",
+    "//content/public/browser",
     "//components/os_crypt",
   ]
 
@@ -796,6 +804,7 @@ source_set("metrics") {
     "//base",
     "//chrome/common",
     "//components/metrics",
+    "//components/metrics_services_manager",
     "//components/version_info",
     "//content/public/browser",
   ]
@@ -846,6 +855,8 @@ source_set("lifetime") {
   configs += [ ":chromium_src_config" ]
 
   sources = [
+    "chrome/browser/download/download_core_service.cc",
+    "//chrome/browser/download/download_core_service.h",
     "//chrome/browser/lifetime/termination_notification.cc",
     "//chrome/browser/lifetime/termination_notification.h",
     "//chrome/browser/lifetime/application_lifetime.cc",
