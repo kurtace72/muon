@@ -233,6 +233,8 @@ source_set("browser") {
     "//chrome/browser/speech/tts_win.cc",
     "//chrome/browser/ui/browser_dialogs.h",
     "chrome/browser/ui/simple_message_box.cc",
+    "chrome/browser/ui/user_manager.cc",
+    "//chrome/browser/ui/user_manager.h",
     "//chrome/browser/ui/cocoa/color_chooser_mac.mm",
     "//chrome/browser/ui/zoom/chrome_zoom_level_prefs.cc",
     "//chrome/browser/ui/zoom/chrome_zoom_level_prefs.h",
