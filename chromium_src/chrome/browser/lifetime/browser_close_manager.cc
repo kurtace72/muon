@@ -6,4 +6,6 @@
 
 BrowserCloseManager::BrowserCloseManager() {}
 
+BrowserCloseManager::~BrowserCloseManager() {}
+
 void BrowserCloseManager::StartClosingBrowsers() {}
