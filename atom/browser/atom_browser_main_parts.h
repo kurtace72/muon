@@ -9,11 +9,11 @@
 #include <memory>
 #include <string>
 
-#include "base/build_config.h"
 #include "base/callback.h"
 #include "base/command_line.h"
 #include "base/memory/memory_pressure_listener.h"
 #include "base/timer/timer.h"
+#include "build/build_config.h"
 #include "brightray/browser/browser_main_parts.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/common/main_function_params.h"
