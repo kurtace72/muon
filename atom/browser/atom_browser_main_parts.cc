@@ -255,11 +255,12 @@ void AtomBrowserMainParts::IdleHandler() {
 #if defined(OS_WIN)
 void AtomBrowserMainParts::PreMainMessageLoopStart() {
   brightray::BrowserMainParts::PreMainMessageLoopStart();
-  if (!parameters().ui_task) {
+  if (!parameters_.ui_task) {
     // Make sure that we know how to handle exceptions from the message loop.
     InitializeWindowProcExceptions();
   }
 }
+#endif
 
 void AtomBrowserMainParts::PreMainMessageLoopRun() {
 #if defined(USE_AURA)
