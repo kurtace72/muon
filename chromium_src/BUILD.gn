@@ -10,19 +10,6 @@ import("//printing/features/features.gni")
 import("//rlz/features/features.gni")
 
 config("chromium_src_config") {
-  include_dirs = [
-    "//electron/chromium_src",
-    "//electron",
-    "//electron/vendor",
-    "//electron/vendor/brightray",
-    rebase_path(".", "//"),
-    root_gen_dir,
-    "$root_gen_dir/chrome",
-    "$root_gen_dir/components/strings",
-    "//skia/config",
-    "//third_party/skia/include/core",
-  ]
-
   if (is_clang) {
     cflags = [
       "-Wno-error",
@@ -53,9 +40,6 @@ source_set("common") {
     "//electron/build:electron_config",
   ]
 
-  include_dirs = [
-    # force this to appear before the chromium root src dir
-    ".",
   ]
 
   sources = []
@@ -78,15 +62,8 @@ source_set("common") {
 }
 
 source_set("renderer") {
-  configs += [
-    "//electron/build:electron_config",
-    ":chromium_src_config",
-  ]
-
-  include_dirs = [
-    # force this to appear before the chromium root src dir
-    ".",
-  ]
+  configs += [ "//electron/build:electron_config" ]
+  configs += [ ":chromium_src_config" ]
 
   sources = [
     "chrome/renderer/content_settings_observer.cc",
@@ -114,14 +91,11 @@ source_set("renderer") {
 }
 
 source_set("browser") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
 
-  include_dirs = [
-    # force this to appear before the chromium root src dir
-    ".",
-  ]
-
   public_deps = []
+
   deps = [
     ":bookmarks",
     ":devtools",
@@ -451,8 +425,8 @@ source_set("browser") {
 }
 
 source_set("menu_bar") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
-  include_dirs = [ "." ] # force this to appear before the chromium src dir
 
   sources = [
     "//chrome/browser/ui/views/frame/global_menu_bar_registrar_x11.cc",
@@ -470,8 +444,8 @@ source_set("menu_bar") {
 }
 
 source_set("devtools") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
-  include_dirs = [ "." ] # force this to appear before the chromium src dir
 
   sources = [
     # devtools
@@ -514,8 +488,8 @@ source_set("devtools") {
 }
 
 source_set("importer") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
-  include_dirs = [ "." ] # force this to appear before the chromium src dir
 
   sources = [
     "//chrome/browser/importer/external_process_importer_client.cc",
@@ -548,8 +522,8 @@ source_set("importer") {
 }
 
 source_set("bookmarks") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
-  include_dirs = [ "." ] # force this to appear before the chromium src dir
 
   if (is_win) {
     cflags = [ "/wd4172", ]
@@ -570,8 +544,8 @@ source_set("bookmarks") {
 }
 
 source_set("search_engines") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
-  include_dirs = [ "." ] # force this to appear before the chromium src dir
 
   sources = [
     "chrome/browser/search_engines/template_url_service_factory.cc",
@@ -589,8 +563,8 @@ source_set("search_engines") {
 }
 
 source_set("sync") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
-  include_dirs = [ "." ] # force this to appear before the chromium src dir
 
   sources = [
     "chrome/browser/sync/glue/sync_start_util.cc",
@@ -605,8 +579,8 @@ source_set("sync") {
 }
 
 source_set("web_data") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
-  include_dirs = [ "." ] # force this to appear before the chromium src dir
 
   sources = [
     "//chrome/browser/web_data_service_factory.cc",
@@ -623,8 +597,8 @@ source_set("web_data") {
 }
 
 source_set("password_manager") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
-  include_dirs = [ "." ] # force this to appear before the chromium src dir
 
   if (is_win) {
     all_dependent_configs = [ "//chrome/browser:browser_win_linker_flags" ]
@@ -695,8 +669,8 @@ source_set("password_manager") {
 }
 
 source_set("favicon") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
-  include_dirs = [ "." ] # force this to appear before the chromium src dir
 
   sources = [
     "//chrome/browser/favicon/chrome_favicon_client.cc",
@@ -722,8 +696,8 @@ source_set("favicon") {
 }
 
 source_set("search") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
-  include_dirs = [ "." ] # force this to appear before the chromium src dir
 
   sources = [
     "chrome/browser/search/search.cc",
@@ -735,8 +709,8 @@ source_set("search") {
 }
 
 source_set("history") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
-  include_dirs = [ "." ] # force this to appear before the chromium src dir
 
   sources = [
     "//chrome/browser/history/chrome_history_backend_client.cc",
@@ -762,10 +736,10 @@ source_set("history") {
 }
 
 source_set("tab_manager") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
   configs += [ "//build/config/compiler:no_size_t_to_int_warning" ]
 
-  include_dirs = [ "." ] # force this to appear before the chromium src dir
   sources = [
     "//chrome/browser/engagement/site_engagement_metrics.cc",
     "//chrome/browser/engagement/site_engagement_metrics.h",
@@ -803,8 +777,8 @@ source_set("tab_manager") {
 }
 
 source_set("sessions") {
+  configs += [ "//electron/build:electron_config" ]
   configs += [ ":chromium_src_config" ]
-  include_dirs = [ "." ] # force this to appear before the chromium src dir
 
   sources = [
     "//chrome/browser/profiles/incognito_helpers.cc",
