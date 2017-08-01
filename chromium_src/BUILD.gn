@@ -860,6 +860,8 @@ source_set("lifetime") {
   sources = [
     "chrome/browser/download/download_core_service.cc",
     "//chrome/browser/download/download_core_service.h",
+    "chrome/browser/lifetime/browser_close_manager.cc",
+    "//chrome/browser/lifetime/browser_close_manager.h",
     "//chrome/browser/lifetime/termination_notification.cc",
     "//chrome/browser/lifetime/termination_notification.h",
     "//chrome/browser/lifetime/application_lifetime.cc",
