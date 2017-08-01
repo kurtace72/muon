@@ -19,6 +19,8 @@
 #include "content/public/common/content_switches.h"
 
 #if defined(OS_WIN)
+#include "base/file_path.h"
+#include "chrome/install_static/install_util.h"
 #include "components/crash/content/app/breakpad_win.h"
 #elif defined(OS_LINUX)
 #include "components/crash/content/app/breakpad_linux.h"
@@ -102,6 +104,15 @@ void MuonCrashReporterClient::InitCrashReporting() {
       browser_process || install_from_dmg_relauncher_process;
 
   crash_reporter::InitializeCrashpad(initial_client, process_type);
+#elif defined(OS_WIN)
+  base::FilePath user_data;
+  if (!PathService::Get(chrome::DIR_USER_DATA, &user_data))
+    return;
+
+  LOG(ERROR) << user_data.MaybeAsASCII();
+  crash_reporter::InitializeCrashpadWithEmbeddedHandler(
+      process_type.empty(), install_static::UTF16ToUTF8(process_type),
+      install_static::UTF16ToUTF8(user_data_dir.value()));
 #else
   breakpad::InitCrashReporter(process_type);
 #endif
@@ -166,6 +177,10 @@ void MuonCrashReporterClient::InitForProcess() {
     return;
 #if defined(OS_POSIX) && !defined(OS_MACOSX)
   if (process_type == switches::kZygoteProcess)
+    return;
+#elif defined(OS_WIN)
+  if (process_type != install_static::kCrashpadHandler &&
+      process_type != install_static::kFallbackHandler)
     return;
 #endif
 

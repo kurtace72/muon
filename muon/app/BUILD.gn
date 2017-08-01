@@ -9,7 +9,7 @@ source_set("app") {
   ]
 
   deps = [
-    "//components/crash/content/app:app_breakpad_mac_win_to_be_deleted",
+    "//components/crash/content/app",
     "//components/metrics",
     "//components/prefs",
     "//electron/chromium_src:browser",

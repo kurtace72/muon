@@ -53,11 +53,6 @@ source_set("app") {
     ]
   }
 
-  public_deps = [
-    "//components/crash/content/app",
-    "//components/crash/content/browser",
-  ]
-
   deps = [
     "//base",
     "//chrome/common",
