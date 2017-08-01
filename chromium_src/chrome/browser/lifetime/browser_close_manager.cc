@@ -4,6 +4,8 @@
 
 #include "chrome/browser/lifetime/browser_close_manager.h"
 
+#include "base/callback.h"
+
 BrowserCloseManager::BrowserCloseManager() {}
 
 BrowserCloseManager::~BrowserCloseManager() {}
