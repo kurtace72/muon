@@ -689,7 +689,7 @@ source_set("password_manager") {
   configs += [ ":chromium_src_config" ]
 
   if (is_win) {
-    all_dependent_configs = [ ":browser_win_linker_flags" ]
+    all_dependent_configs = [ "//chrome/browser:browser_win_linker_flags" ]
   }
 
   sources = [
