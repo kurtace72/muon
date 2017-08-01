@@ -58,13 +58,11 @@ void MuonCrashReporterClient::GetProductNameAndVersion(
 }
 #endif
 
-#if defined(OS_MACOSX)
+#if defined(OS_WIN) || defined(OS_MACOSX)
 bool MuonCrashReporterClient::ShouldMonitorCrashHandlerExpensively() {
   return false;
 }
-#endif
 
-#if defined(OS_WIN) || defined(OS_MACOSX)
 bool MuonCrashReporterClient::ReportingIsEnforcedByPolicy(
     bool* breakpad_enabled) {
   return false;
@@ -111,7 +109,6 @@ void MuonCrashReporterClient::InitCrashReporting() {
   if (!PathService::Get(chrome::DIR_USER_DATA, &user_data_dir))
     return;
 
-  LOG(ERROR) << user_data_dir.MaybeAsASCII();
   crash_reporter::InitializeCrashpadWithEmbeddedHandler(
       process_type.empty(), process_type,
       install_static::UTF16ToUTF8(user_data_dir.value()));
@@ -174,7 +171,6 @@ void MuonCrashReporterClient::InitForProcess() {
   std::string process_type = command_line->GetSwitchValueASCII(
       ::switches::kProcessType);
 
-  // browser process initializes in BrowserProcessImpl::PreCreateThreads
   if (process_type.empty())
     return;
 #if defined(OS_POSIX) && !defined(OS_MACOSX)

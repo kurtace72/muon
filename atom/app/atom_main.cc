@@ -29,6 +29,18 @@
 #include "chrome/install_static/product_install_details.h"
 #include "content/public/app/sandbox_helper_win.h"
 #include "sandbox/win/src/sandbox_types.h"
+
+
+#include "chrome/common/chrome_switches.h"
+#include "chrome_elf/chrome_elf_main.h"
+#include "components/crash/content/app/crash_switches.h"
+#include "components/crash/content/app/crashpad.h"
+#include "components/crash/content/app/fallback_crash_handling_win.h"
+#include "components/crash/content/app/run_as_crashpad_handler_win.h"
+#include "content/public/common/content_switches.h"
+#include "content/public/common/result_codes.h"
+#include "chrome_elf/chrome_elf_main.h"
+
 #endif  // defined(OS_WIN)
 
 #if defined(OS_MACOSX)
@@ -54,6 +66,33 @@ int main(int argc, const char* argv[]) {
 
 #if defined(OS_WIN)
   install_static::InitializeProductDetailsForPrimaryModule();
+  SignalInitializeCrashReporting();
+
+  // Initialize the CommandLine singleton from the environment.
+  base::CommandLine::Init(0, nullptr);
+  const base::CommandLine* command_line =
+      base::CommandLine::ForCurrentProcess();
+
+  const std::string process_type =
+      command_line->GetSwitchValueASCII(switches::kProcessType);
+
+  // Confirm that an explicit prefetch profile is used for all process types
+  // except for the browser process. Any new process type will have to assign
+  // itself a prefetch id. See kPrefetchArgument* constants in
+  // content_switches.cc for details.
+  // DCHECK(process_type.empty() ||
+  //        HasValidWindowsPrefetchArgument(*command_line));
+
+
+  if (process_type == crash_reporter::switches::kCrashpadHandler) {
+    crash_reporter::SetupFallbackCrashHandling(*command_line);
+    base::string16 user_data_dir = install_static::GetUserDataDirectory();
+    return crash_reporter::RunAsCrashpadHandler(
+        *base::CommandLine::ForCurrentProcess(), base::FilePath(user_data_dir),
+        switches::kProcessType, switches::kUserDataDir);
+  } else if (process_type == crash_reporter::switches::kFallbackCrashHandler) {
+    // return RunFallbackCrashHandler(*command_line);
+  }
 #endif
 
   atom::AtomMainDelegate chrome_main_delegate(
