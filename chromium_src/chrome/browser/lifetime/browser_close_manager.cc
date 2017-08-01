@@ -9,3 +9,9 @@ BrowserCloseManager::BrowserCloseManager() {}
 BrowserCloseManager::~BrowserCloseManager() {}
 
 void BrowserCloseManager::StartClosingBrowsers() {}
+
+void BrowserCloseManager::ConfirmCloseWithPendingDownloads(
+    int download_count,
+    const base::Callback<void(bool)>& callback) {
+  callback_.Run(true);
+}
