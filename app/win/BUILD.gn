@@ -84,7 +84,7 @@ executable("electron_exe") {
     "//breakpad:breakpad_sender",
     "//chrome/browser:chrome_process_finder",
     "//chrome/common:constants",
-    "//chrome/install_static:install_static_util",
+    "//chrome/install_static:secondary_module",
     "//chrome_elf",
     "//components/crash/content/app:run_as_crashpad_handler",
     "//components/flags_ui:switches",

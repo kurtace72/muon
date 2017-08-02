@@ -59,12 +59,23 @@ void MuonCrashReporterClient::GetProductNameAndVersion(
 }
 #endif
 
-#if defined(OS_WIN) || defined(OS_MACOSX)
+#if defined(OS_WIN)
+bool MuonCrashReporterClient::GetCrashDumpLocation(base::string16* crash_dir) {
+  base::FilePath path;
+  if (PathService::Get(chrome::DIR_CRASH_DUMPS, &path)) {
+    *crash_dir = path.value();
+    return true;
+  }
+  return false;
+}
+#elif defined(OS_MACOSX)
 bool MuonCrashReporterClient::GetCrashDumpLocation(
     base::FilePath* crash_dir) {
   return PathService::Get(chrome::DIR_CRASH_DUMPS, crash_dir);
 }
+#endif
 
+#if defined(OS_WIN) || defined(OS_MACOSX)
 bool MuonCrashReporterClient::ShouldMonitorCrashHandlerExpensively() {
   return false;
 }
@@ -85,16 +96,17 @@ bool MuonCrashReporterClient::GetCollectStatsInSample() {
 
 //  static
 void MuonCrashReporterClient::InitCrashReporting() {
-  if (!IsCrashReportingEnabled()) {
-    LOG(ERROR) << "Crash reporting is disabled";
-    return;
-  } else {
-    LOG(ERROR) << "enabling crash reporting";
-  }
-
   auto command_line = base::CommandLine::ForCurrentProcess();
   std::string process_type = command_line->GetSwitchValueASCII(
       ::switches::kProcessType);
+
+  if (!IsCrashReportingEnabled()) {
+    LOG(ERROR) << "Crash reporting is disabled " << process_type;
+    return;
+  } else {
+    LOG(ERROR) << "enabling crash reporting" << process_type;
+  }
+
 
   crash_keys::SetCrashKeysFromCommandLine(*command_line);
   MuonCrashReporterClient* crash_client = new MuonCrashReporterClient();

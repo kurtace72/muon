@@ -148,27 +148,32 @@ base::FilePath InitializeUserDataDir() {
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   base::FilePath user_data_dir;
 
-  // first check the env
-  std::string user_data_dir_string;
-  std::unique_ptr<base::Environment> environment(base::Environment::Create());
-  if (environment->GetVar("BRAVE_USER_DATA_DIR", &user_data_dir_string) &&
-      base::IsStringUTF8(user_data_dir_string)) {
-    user_data_dir = base::FilePath::FromUTF8Unsafe(user_data_dir_string);
-    command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
-  }
-
-  // next check the user-data-dir switch
-  if (user_data_dir.empty() ||
-      command_line->HasSwitch(switches::kUserDataDir)) {
-    user_data_dir =
-      command_line->GetSwitchValuePath(switches::kUserDataDir);
-    if (!user_data_dir.empty() && !user_data_dir.IsAbsolute()) {
-      base::FilePath app_data_dir;
-      brave::GetDefaultAppDataDirectory(&app_data_dir);
-      user_data_dir = app_data_dir.Append(user_data_dir);
+  if (!command_line->HasSwitch(switches::kUserDataDir)) {
+    // first check the env
+    std::string user_data_dir_string;
+    std::unique_ptr<base::Environment> environment(base::Environment::Create());
+    if (environment->GetVar("BRAVE_USER_DATA_DIR", &user_data_dir_string) &&
+        base::IsStringUTF8(user_data_dir_string)) {
+      user_data_dir = base::FilePath::FromUTF8Unsafe(user_data_dir_string);
+      command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
     }
-  }
 
+    // next check the user-data-dir switch
+    if (user_data_dir.empty() ||
+        command_line->HasSwitch("user-data-dir-name")) {
+      user_data_dir =
+        command_line->GetSwitchValuePath("user-data-dir-name");
+      if (!user_data_dir.empty() && !user_data_dir.IsAbsolute()) {
+        base::FilePath app_data_dir;
+        brave::GetDefaultAppDataDirectory(&app_data_dir);
+        user_data_dir = app_data_dir.Append(user_data_dir);
+        command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
+      }
+    }
+  } else {
+    user_data_dir =
+        command_line->GetSwitchValuePath(switches::kUserDataDir);
+  }
   // On Windows, trailing separators leave Chrome in a bad state.
   // See crbug.com/464616.
   if (user_data_dir.EndsWithSeparator())

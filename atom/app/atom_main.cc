@@ -24,6 +24,7 @@
 #include "base/debug/dump_without_crashing.h"
 #include "base/win/win_util.h"
 #include "chrome/common/chrome_constants.h"
+#include "chrome/install_static/initialize_from_primary_module.h"
 #include "chrome/install_static/install_details.h"
 #include "chrome/install_static/install_util.h"
 #include "chrome/install_static/product_install_details.h"
@@ -65,7 +66,7 @@ int main(int argc, const char* argv[]) {
   int64_t exe_entry_point_ticks = 0;
 
 #if defined(OS_WIN)
-  install_static::InitializeProductDetailsForPrimaryModule();
+  install_static::InitializeFromPrimaryModule();
   SignalInitializeCrashReporting();
 
   // Initialize the CommandLine singleton from the environment.
