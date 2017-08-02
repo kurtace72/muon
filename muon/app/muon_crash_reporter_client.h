@@ -14,6 +14,7 @@
 
 namespace base {
 class CommandLine;
+class FilePath;
 }
 
 class PrefService;
@@ -35,9 +36,9 @@ class MuonCrashReporterClient : public ChromeCrashReporterClient {
 #if defined(OS_WIN) || defined(OS_MACOSX)
   bool ReportingIsEnforcedByPolicy(bool* breakpad_enabled) override;
   bool ShouldMonitorCrashHandlerExpensively() override;
+  bool GetCrashDumpLocation(base::FilePath* crash_dir) override;
 #endif
 
-#endif
   bool GetCollectStatsConsent() override;
   bool GetCollectStatsInSample() override;
 

@@ -9,8 +9,10 @@
 #include "base/command_line.h"
 #include "base/debug/crash_logging.h"
 #include "base/debug/leak_annotations.h"
+#include "base/path_service.h"
 #include "chrome/browser/browser_process_impl.h"
 #include "chrome/common/chrome_switches.h"
+#include "chrome/common/chrome_paths.h"
 #include "chrome/common/crash_keys.h"
 #include "components/crash/content/app/crashpad.h"
 #include "components/metrics/metrics_pref_names.h"
@@ -21,7 +23,6 @@
 #if defined(OS_WIN)
 #include "base/path_service.h"
 #include "base/files/file_path.h"
-#include "chrome/common/chrome_paths.h"
 #include "chrome/install_static/install_util.h"
 #include "components/crash/content/app/crash_switches.h"
 #elif defined(OS_LINUX)
@@ -59,6 +60,11 @@ void MuonCrashReporterClient::GetProductNameAndVersion(
 #endif
 
 #if defined(OS_WIN) || defined(OS_MACOSX)
+bool MuonCrashReporterClient::GetCrashDumpLocation(
+    base::FilePath* crash_dir) {
+  return PathService::Get(chrome::DIR_CRASH_DUMPS, crash_dir);
+}
+
 bool MuonCrashReporterClient::ShouldMonitorCrashHandlerExpensively() {
   return false;
 }
