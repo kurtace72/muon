@@ -1001,10 +1001,10 @@ index 0d3de65043a0b66fc1d3bc8fee578ae13179f611..93f10e5a838098c125a709b0939bf223
          size_t bytes_read =
              WaitForCrashReportUploadProcess(fds[0], kCrashIdLength, id_buf);
 diff --git a/components/crash/content/app/crashpad_mac.mm b/components/crash/content/app/crashpad_mac.mm
-index 485c2b4b3e98244f6303c92394dd0f6eab7263c6..fab01cb6f7cac899dc0ae475feeebe518485609a 100644
+index 3bae07e14c690869515c4ce233988addad12f1c1..3ad9825f406bc10e21579cccb5677651cf780ae5 100644
 --- a/components/crash/content/app/crashpad_mac.mm
 +++ b/components/crash/content/app/crashpad_mac.mm
-@@ -55,6 +55,8 @@ base::FilePath PlatformCrashpadInitialization(
+@@ -53,6 +53,8 @@ base::FilePath PlatformCrashpadInitialization(bool initial_client,
        // Only allow the possibility of report upload in official builds. This
        // crash server won't have symbols for any other build types.
        std::string url = "https://clients2.google.com/cr/report";
@@ -1100,6 +1100,19 @@ index bc36a92f4ad97e84d65c5213acbb68fc89aae8d9..9567f7f130181a40917751fff899b439
  }
  
  // static
+diff --git a/components/metrics/metrics_service_accessor.cc b/components/metrics/metrics_service_accessor.cc
+index 29b67bd911888a5eedd2d244fbe70aac27899987..918d36ce52cebc97fcf3f952979362c31af70dbd 100644
+--- a/components/metrics/metrics_service_accessor.cc
++++ b/components/metrics/metrics_service_accessor.cc
+@@ -16,7 +16,7 @@ namespace metrics {
+ // static
+ bool MetricsServiceAccessor::IsMetricsReportingEnabled(
+     PrefService* pref_service) {
+-#if defined(GOOGLE_CHROME_BUILD)
++#if defined(GOOGLE_CHROME_BUILD) || !defined(MUON_CHROMIUM_BUILD)
+   // In official builds, disable metrics when reporting field trials are
+   // forced; otherwise, use the value of the user's preference to determine
+   // whether to enable metrics reporting.
 diff --git a/components/os_crypt/key_storage_libsecret.cc b/components/os_crypt/key_storage_libsecret.cc
 index ea034fd48c08de6f5f755fbffb962390ec8dd7b2..ae6d1fcf40d24c89941e1717c306982555156ca5 100644
 --- a/components/os_crypt/key_storage_libsecret.cc
@@ -1125,19 +1138,6 @@ index ea034fd48c08de6f5f755fbffb962390ec8dd7b2..ae6d1fcf40d24c89941e1717c3069825
    attrs.Append("application", kApplicationName);
    GList* search_results = LibsecretLoader::secret_service_search_sync(
        nullptr /* default secret service */, &kKeystoreSchemaV2, attrs.Get(),
-diff --git a/components/metrics/metrics_service_accessor.cc b/components/metrics/metrics_service_accessor.cc
-index 29b67bd911888a5eedd2d244fbe70aac27899987..918d36ce52cebc97fcf3f952979362c31af70dbd 100644
---- a/components/metrics/metrics_service_accessor.cc
-+++ b/components/metrics/metrics_service_accessor.cc
-@@ -16,7 +16,7 @@ namespace metrics {
- // static
- bool MetricsServiceAccessor::IsMetricsReportingEnabled(
-     PrefService* pref_service) {
--#if defined(GOOGLE_CHROME_BUILD)
-+#if defined(GOOGLE_CHROME_BUILD) || !defined(MUON_CHROMIUM_BUILD)
-   // In official builds, disable metrics when reporting field trials are
-   // forced; otherwise, use the value of the user's preference to determine
-   // whether to enable metrics reporting.
 diff --git a/components/os_crypt/keychain_password_mac.mm b/components/os_crypt/keychain_password_mac.mm
 index 2b38db266f9aa1f4141c8649c021042ede4e5589..ea0387b11f4b00f87596d738c152aa4cc43b2beb 100644
 --- a/components/os_crypt/keychain_password_mac.mm
