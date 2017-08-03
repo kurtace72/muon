@@ -128,8 +128,7 @@ void MuonCrashReporterClient::InitCrashReporting() {
     return;
 
   crash_reporter::InitializeCrashpadWithEmbeddedHandler(
-      process_type.empty(), process_type,
-      install_static::UTF16ToUTF8(user_data_dir.value()));
+      process_type.empty(), process_type);
 #else
   breakpad::InitCrashReporter(process_type);
 #endif
