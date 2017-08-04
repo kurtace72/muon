@@ -21,10 +21,13 @@
 #include "content/public/common/content_switches.h"
 
 #if defined(OS_WIN)
+#include "base/format_macros.h"
 #include "base/path_service.h"
 #include "base/files/file_path.h"
 #include "chrome/install_static/install_util.h"
+#include "chrome/install_static/user_data_dir.h"
 #include "components/crash/content/app/crash_switches.h"
+#include "chrome/common/chrome_constants.h"
 #elif defined(OS_LINUX)
 #include "components/crash/content/app/breakpad_linux.h"
 #endif
@@ -33,9 +36,27 @@
 #include "components/crash/content/app/crashpad.h"
 #endif
 
+// #include "chrome/common/chrome_result_codes.h"
+
+namespace {
+
+#if defined(OS_WIN)
+// Type for the function pointer to enable and disable crash reporting on
+// windows. Needed because the function is loaded from chrome_elf.
+typedef void (*SetUploadConsentPointer)(bool);
+
+// The name of the function used to set the uploads enabled state in
+// components/crash/content/app/crashpad.cc. This is used to call the function
+// exported by the chrome_elf dll.
+const char kCrashpadUpdateConsentFunctionName[] = "SetUploadConsentImpl";
+#endif  // OS_WIN
+
+}
+
 using metrics::MetricsServiceAccessor;
 
 MuonCrashReporterClient::MuonCrashReporterClient() {
+  LOG(ERROR) << "set crash reporter client";
   crash_reporter::SetCrashReporterClient(this);
 }
 
@@ -59,24 +80,25 @@ void MuonCrashReporterClient::GetProductNameAndVersion(
 }
 #endif
 
-#if defined(OS_WIN)
-bool MuonCrashReporterClient::GetCrashDumpLocation(base::string16* crash_dir) {
-  base::FilePath path;
-  if (PathService::Get(chrome::DIR_CRASH_DUMPS, &path)) {
-    *crash_dir = path.value();
-    return true;
-  }
-  return false;
-}
-#elif defined(OS_MACOSX)
-bool MuonCrashReporterClient::GetCrashDumpLocation(
-    base::FilePath* crash_dir) {
-  return PathService::Get(chrome::DIR_CRASH_DUMPS, crash_dir);
-}
-#endif
+// #if defined(OS_WIN)
+// bool MuonCrashReporterClient::GetCrashDumpLocation(base::string16* crash_dir) {
+//   base::FilePath path;
+//   if (PathService::Get(chrome::DIR_CRASH_DUMPS, &path)) {
+//     *crash_dir = path.value();
+//     return true;
+//   }
+//   return false;
+// }
+// #elif defined(OS_MACOSX)
+// bool MuonCrashReporterClient::GetCrashDumpLocation(
+//     base::FilePath* crash_dir) {
+//   return PathService::Get(chrome::DIR_CRASH_DUMPS, crash_dir);
+// }
+// #endif
 
 #if defined(OS_WIN) || defined(OS_MACOSX)
 bool MuonCrashReporterClient::ShouldMonitorCrashHandlerExpensively() {
+  LOG(ERROR) << "should monitor crash handler expensivly??";
   return false;
 }
 
@@ -94,25 +116,51 @@ bool MuonCrashReporterClient::GetCollectStatsInSample() {
   return IsCrashReportingEnabled();
 }
 
+
+// static ChromeCrashReporterClient* instance = nullptr;
+// if (instance)
+//   return;
+
+// instance = new ChromeCrashReporterClient();
+// ANNOTATE_LEAKING_OBJECT_PTR(instance);
+
+// std::wstring process_type = install_static::GetSwitchValueFromCommandLine(
+//     ::GetCommandLine(), install_static::kProcessType);
+// // Don't set up Crashpad crash reporting in the Crashpad handler itself, nor
+// // in the fallback crash handler for the Crashpad handler process.
+// if (process_type != install_static::kCrashpadHandler &&
+//     process_type != install_static::kFallbackHandler) {
+//   crash_reporter::SetCrashReporterClient(instance);
+//   crash_reporter::InitializeCrashpadWithEmbeddedHandler(
+//       process_type.empty(), install_static::UTF16ToUTF8(process_type));
+// }
+
+
 //  static
 void MuonCrashReporterClient::InitCrashReporting() {
+  static MuonCrashReporterClient* instance = nullptr;
+
+  LOG(ERROR) << "init crash reporting";
+
+  if (instance)
+    return;
+
+  if (!IsCrashReportingEnabled()) {
+    LOG(ERROR) << "Crash reporting is disabled";
+    return;
+  } else {
+    LOG(ERROR) << "enabling crash reporting";
+  }
+
+  // crash_keys::SetCrashKeysFromCommandLine(*command_line);
+  instance = new MuonCrashReporterClient();
+  ANNOTATE_LEAKING_OBJECT_PTR(crash_client);
+
+#if defined(OS_MACOSX)
   auto command_line = base::CommandLine::ForCurrentProcess();
   std::string process_type = command_line->GetSwitchValueASCII(
       ::switches::kProcessType);
 
-  if (!IsCrashReportingEnabled()) {
-    LOG(ERROR) << "Crash reporting is disabled " << process_type;
-    return;
-  } else {
-    LOG(ERROR) << "enabling crash reporting" << process_type;
-  }
-
-
-  crash_keys::SetCrashKeysFromCommandLine(*command_line);
-  MuonCrashReporterClient* crash_client = new MuonCrashReporterClient();
-  ANNOTATE_LEAKING_OBJECT_PTR(crash_client);
-
-#if defined(OS_MACOSX)
   const bool install_from_dmg_relauncher_process =
       process_type == switches::kRelauncherProcess &&
       command_line->HasSwitch(switches::kRelauncherProcessDMGDevice);
@@ -123,12 +171,11 @@ void MuonCrashReporterClient::InitCrashReporting() {
 
   crash_reporter::InitializeCrashpad(initial_client, process_type);
 #elif defined(OS_WIN)
-  base::FilePath user_data_dir;
-  if (!PathService::Get(chrome::DIR_USER_DATA, &user_data_dir))
-    return;
 
+  std::wstring process_type = install_static::GetSwitchValueFromCommandLine(
+      ::GetCommandLine(), install_static::kProcessType);
   crash_reporter::InitializeCrashpadWithEmbeddedHandler(
-      process_type.empty(), process_type);
+      process_type.empty(), install_static::UTF16ToUTF8(process_type));
 #else
   breakpad::InitCrashReporter(process_type);
 #endif
@@ -168,10 +215,30 @@ void MuonCrashReporterClient::SetCrashReportingEnabledForProcess(bool enabled) {
     command_line->AppendSwitch(switches::kDisableBreakpad);
   }
 
-#if defined(OS_MACOSX) || defined (OS_WIN)
+#if defined(OS_MACOSX) || defined(OS_WIN)
   crash_reporter::SetUploadConsent(enabled);
 #endif
+
+#if defined(OS_WIN)
+  install_static::SetCollectStatsInSample(enabled);
+
+  // Next, get Crashpad to pick up the sampling state for this session.
+
+  // The crash reporting is handled by chrome_elf.dll.
+  HMODULE elf_module = GetModuleHandle(chrome::kChromeElfDllName);
+  static SetUploadConsentPointer set_upload_consent =
+      reinterpret_cast<SetUploadConsentPointer>(
+          GetProcAddress(elf_module, kCrashpadUpdateConsentFunctionName));
+
+  if (set_upload_consent) {
+    // Crashpad will use the kRegUsageStatsInSample registry value to apply
+    // sampling correctly, but may_record already reflects the sampling state.
+    // This isn't a problem though, since they will be consistent.
+    set_upload_consent(enabled);
+  }
+#endif
 }
+
 
 //  static
 void MuonCrashReporterClient::AppendExtraCommandLineSwitches(
@@ -184,20 +251,26 @@ void MuonCrashReporterClient::AppendExtraCommandLineSwitches(
 
 //  static
 void MuonCrashReporterClient::InitForProcess() {
+  LOG(ERROR) << "InitFOrProcess";
   auto command_line = base::CommandLine::ForCurrentProcess();
   std::string process_type = command_line->GetSwitchValueASCII(
       ::switches::kProcessType);
 
-  if (process_type.empty())
+  if (process_type.empty()) {
+    LOG(ERROR) << "empty :(";
     return;
+  }
 #if defined(OS_POSIX) && !defined(OS_MACOSX)
   if (process_type == switches::kZygoteProcess)
     return;
 #elif defined(OS_WIN)
-  if (process_type == crash_reporter::switches::kCrashpadHandler)
+  if (process_type == crash_reporter::switches::kCrashpadHandler) {
+    LOG(ERROR) << "crash handler process";
     return;
+  }
 #endif
 
+  LOG(ERROR) << "calling init crash reporter";
   InitCrashReporting();
 }
 

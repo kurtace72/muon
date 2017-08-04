@@ -479,7 +479,7 @@ index 7f659bdcdccbce1044e3ee2f2d9295cdce20b02d..b22a1518d28b641ff358d00013536f68
  
  process_version("version_header") {
 diff --git a/chrome/common/chrome_constants.cc b/chrome/common/chrome_constants.cc
-index 94cdc2aeb7398a433b9afcfbbcfa87dd1e57b65d..7ce8db49362e499abcd93298468257cff9a32116 100644
+index 94cdc2aeb7398a433b9afcfbbcfa87dd1e57b65d..9263f1283ffe964eec8a479f7a1b7de6b5162863 100644
 --- a/chrome/common/chrome_constants.cc
 +++ b/chrome/common/chrome_constants.cc
 @@ -10,11 +10,11 @@
@@ -502,16 +502,16 @@ index 94cdc2aeb7398a433b9afcfbbcfa87dd1e57b65d..7ce8db49362e499abcd93298468257cf
  #if defined(OS_WIN)
  const base::FilePath::CharType kBrowserProcessExecutableNameChromium[] =
 -    FPL("chrome.exe");
-+    FPL("Brave.exe");
++    FPL("brave.exe");
  const base::FilePath::CharType kBrowserProcessExecutableName[] =
 -    FPL("chrome.exe");
-+    FPL("Brave.exe");
++    FPL("brave.exe");
  const base::FilePath::CharType kHelperProcessExecutableNameChromium[] =
 -    FPL("chrome.exe");
-+    FPL("Brave.exe");
++    FPL("brave.exe");
  const base::FilePath::CharType kHelperProcessExecutableName[] =
 -    FPL("chrome.exe");
-+    FPL("Brave.exe");
++    FPL("brave.exe");
  #elif defined(OS_MACOSX)
  const base::FilePath::CharType kBrowserProcessExecutableNameChromium[] =
      FPL(CHROMIUM_PRODUCT_STRING);
@@ -540,16 +540,16 @@ index 94cdc2aeb7398a433b9afcfbbcfa87dd1e57b65d..7ce8db49362e499abcd93298468257cf
  #if defined(OS_WIN)
  const base::FilePath::CharType kBrowserProcessExecutablePathChromium[] =
 -    FPL("chrome.exe");
-+    FPL("Brave.exe");
++    FPL("brave.exe");
  const base::FilePath::CharType kBrowserProcessExecutablePath[] =
 -    FPL("chrome.exe");
-+    FPL("Brave.exe");
++    FPL("brave.exe");
  const base::FilePath::CharType kHelperProcessExecutablePathChromium[] =
 -    FPL("chrome.exe");
-+    FPL("Brave.exe");
++    FPL("brave.exe");
  const base::FilePath::CharType kHelperProcessExecutablePath[] =
 -    FPL("chrome.exe");
-+    FPL("Brave.exe");
++    FPL("brave.exe");
  #elif defined(OS_MACOSX)
  const base::FilePath::CharType kBrowserProcessExecutablePathChromium[] =
      FPL(CHROMIUM_PRODUCT_STRING ".app/Contents/MacOS/" CHROMIUM_PRODUCT_STRING);
@@ -581,17 +581,15 @@ index 94cdc2aeb7398a433b9afcfbbcfa87dd1e57b65d..7ce8db49362e499abcd93298468257cf
  #endif  // OS_*
  
  #if defined(OS_MACOSX)
-@@ -121,8 +121,8 @@ const base::FilePath::CharType kFrameworkExecutableName[] =
+@@ -121,7 +121,7 @@ const base::FilePath::CharType kFrameworkExecutableName[] =
  #endif  // OS_MACOSX
  
  #if defined(OS_WIN)
 -const base::FilePath::CharType kBrowserResourcesDll[] = FPL("chrome.dll");
--const base::FilePath::CharType kChromeElfDllName[] = FPL("chrome_elf.dll");
-+const base::FilePath::CharType kBrowserResourcesDll[] = FPL("Brave.dll");
-+const base::FilePath::CharType kChromeElfDllName[] = FPL("Brave_elf.dll");
++const base::FilePath::CharType kBrowserResourcesDll[] = FPL("brave.dll");
+ const base::FilePath::CharType kChromeElfDllName[] = FPL("chrome_elf.dll");
  const base::FilePath::CharType kStatusTrayWindowClass[] =
      FPL("Chrome_StatusTrayWindow");
- #endif  // defined(OS_WIN)
 diff --git a/chrome/common/chrome_paths_mac.mm b/chrome/common/chrome_paths_mac.mm
 index d0bbbf72ff0e356e424dc280eeb1441c990b5770..8e96ea5706f87ea98ba55fcb583b16a8035fa903 100644
 --- a/chrome/common/chrome_paths_mac.mm
@@ -757,6 +755,22 @@ index efd272e706ba56b748e4b76b96d76cbd03aa07ac..051851c40e6b721035c6b57ed5b35962
      @"Google Chrome": @"Google Chrome",
      @"Google Chrome Canary": @"Google Chrome",
    };
+diff --git a/chrome/install_static/BUILD.gn b/chrome/install_static/BUILD.gn
+index b51284b707dba9393c1edbf7eff413e04bb57d40..358efde9a981136548054f54c7bb1639b7290ec4 100644
+--- a/chrome/install_static/BUILD.gn
++++ b/chrome/install_static/BUILD.gn
+@@ -42,6 +42,11 @@ static_library("install_static_util") {
+       "google_chrome_install_modes.cc",
+       "google_chrome_install_modes.h",
+     ]
++  } else if (!muon_chromium_build) {
++    sources += [
++      "//electron/install_static/brave_install_modes.cc",
++      "chromium_install_modes.h",
++    ]
+   } else {
+     sources += [
+       "chromium_install_modes.cc",
 diff --git a/chrome/installer/util/prebuild/create_string_rc.py b/chrome/installer/util/prebuild/create_string_rc.py
 index ce885e05e62af97777314397c79d1f05aa0dc36a..c2b8a35bfdbd6a23ce288b2007dcb8ce7fee8657 100755
 --- a/chrome/installer/util/prebuild/create_string_rc.py
@@ -953,6 +967,20 @@ index 257467a99132986f56d3ce098515afab24db7941..d8135a059b8621dbe925574b80645221
    // chrome::mojom::ProfileImport:
    void StartImport(const importer::SourceProfile& source_profile,
                     uint16_t items,
+diff --git a/chrome_elf/crash/crash_helper.cc b/chrome_elf/crash/crash_helper.cc
+index c658fa949b7c5040fd74fa02cfea300b290ad8e7..34eb236d2a4a094d59527e198054083650ed3abe 100644
+--- a/chrome_elf/crash/crash_helper.cc
++++ b/chrome_elf/crash/crash_helper.cc
+@@ -74,7 +74,9 @@ bool InitializeCrashReporting() {
+   g_crash_reports = new std::vector<crash_reporter::Report>;
+   g_set_unhandled_exception_filter = new elf_hook::IATHook();
+ 
++#if defined(MUON_CHROMIUM_BUILD)
+   ChromeCrashReporterClient::InitializeCrashReportingForProcess();
++#endif
+ 
+   g_crash_helper_enabled = true;
+   return true;
 diff --git a/components/crash/content/app/breakpad_linux.cc b/components/crash/content/app/breakpad_linux.cc
 index 0d3de65043a0b66fc1d3bc8fee578ae13179f611..93f10e5a838098c125a709b0939bf223897024b0 100644
 --- a/components/crash/content/app/breakpad_linux.cc

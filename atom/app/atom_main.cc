@@ -40,7 +40,9 @@
 #include "components/crash/content/app/run_as_crashpad_handler_win.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/result_codes.h"
-#include "chrome_elf/chrome_elf_main.h"
+
+#include "chrome_elf/crash/crash_helper.h"
+#include "muon/app/muon_crash_reporter_client.h"
 
 #endif  // defined(OS_WIN)
 
@@ -64,16 +66,20 @@ int main(int argc, const char* argv[]) {
   char** argv_setup = uv_setup_args(argc, const_cast<char**>(argv));
 #endif  // OS_WIN
   int64_t exe_entry_point_ticks = 0;
+  // const base::TimeTicks exe_entry_point_ticks = base::TimeTicks::Now();
 
 #if defined(OS_WIN)
   install_static::InitializeFromPrimaryModule();
+  MuonCrashReporterClient::InitCrashReporting();
   SignalInitializeCrashReporting();
+#endif
 
   // Initialize the CommandLine singleton from the environment.
   base::CommandLine::Init(0, nullptr);
   const base::CommandLine* command_line =
       base::CommandLine::ForCurrentProcess();
 
+#if defined(OS_WIN)
   const std::string process_type =
       command_line->GetSwitchValueASCII(switches::kProcessType);
 
@@ -91,19 +97,37 @@ int main(int argc, const char* argv[]) {
   } else if (process_type == crash_reporter::switches::kFallbackCrashHandler) {
     // return RunFallbackCrashHandler(*command_line);
   }
+
+  // Signal Chrome Elf that Chrome has begun to start.
+  SignalChromeElf();
+
+  // Initialize the sandbox services.
+  sandbox::SandboxInterfaceInfo sandbox_info = {0};
+  const bool is_browser = process_type.empty();
+  const bool is_sandboxed = !command_line->HasSwitch(switches::kNoSandbox);
+  if (is_browser || is_sandboxed) {
+    // For child processes that are running as --no-sandbox, don't initialize
+    // the sandbox info, otherwise they'll be treated as brokers (as if they
+    // were the browser).
+    content::InitializeSandboxInfo(&sandbox_info);
+  }
+
+  // ::SetProcessShutdownParameters(0x280 - 1, SHUTDOWN_NORETRY); ??
 #endif
+  // The exit manager is in charge of calling the dtors of singletons.
+  base::AtExitManager exit_manager;
 
   atom::AtomMainDelegate chrome_main_delegate(
       base::TimeTicks::FromInternalValue(exe_entry_point_ticks));
   content::ContentMainParams params(&chrome_main_delegate);
 
 #if defined(OS_WIN)
-  sandbox::SandboxInterfaceInfo sandbox_info = {0};
-  content::InitializeSandboxInfo(&sandbox_info);
-
   // The process should crash when going through abnormal termination.
   base::win::SetShouldCrashOnProcessDetach(true);
   base::win::SetAbortBehaviorForCrashReporting();
+  params.instance = instance;
+  params.sandbox_info = &sandbox_info;
+
   // SetDumpWithoutCrashingFunction must be passed the DumpProcess function
   // from chrome_elf and not from the DLL in order for DumpWithoutCrashing to
   // function correctly.
@@ -114,16 +138,24 @@ int main(int argc, const char* argv[]) {
   CHECK(DumpProcess);
   base::debug::SetDumpWithoutCrashingFunction(DumpProcess);
 
-  params.instance = instance;
-  params.sandbox_info = &sandbox_info;
   atom::AtomCommandLine::InitW(argc, argv_setup);
 #else
   params.argc = argc;
   params.argv = argv;
   atom::AtomCommandLine::Init(argc, argv_setup);
-#endif
+  base::CommandLine::Init(params.argc, params.argv);
+#endif  // defined(OS_WIN)
+  base::CommandLine::Init(0, nullptr);
+  command_line = base::CommandLine::ForCurrentProcess();
+  ALLOW_UNUSED_LOCAL(command_line);
 
-  base::AtExitManager exit_manager;
+  // if (command_line->HasSwitch(switches::kHeadless)) {
+// #if defined(OS_MACOSX)
+//     SetUpBundleOverrides();
+// #endif
+    // return headless::HeadlessShellMain(params);
+  // }
+// #endif  // defined(OS_LINUX) || defined(OS_MACOSX) || defined(OS_WIN)
 
   int rv = content::ContentMain(params);
 

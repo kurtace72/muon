@@ -33,11 +33,11 @@ class MuonCrashReporterClient : public ChromeCrashReporterClient {
                                 const char** version) override;
 #endif
 
-#if defined(OS_WIN)
-bool GetCrashDumpLocation(base::string16* crash_dir) override;
-#elif defined(OS_MACOSX)
-bool GetCrashDumpLocation(base::FilePath* crash_dir) override;
-#endif
+// #if defined(OS_WIN)
+// bool GetCrashDumpLocation(base::string16* crash_dir) override;
+// #elif defined(OS_MACOSX)
+// bool GetCrashDumpLocation(base::FilePath* crash_dir) override;
+// #endif
 
 #if defined(OS_WIN) || defined(OS_MACOSX)
   bool ReportingIsEnforcedByPolicy(bool* breakpad_enabled) override;
