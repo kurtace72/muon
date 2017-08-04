@@ -2104,15 +2104,10 @@ index bf0ece1e723ba1a0644961cfd3a01ce3c14c892a..5e7d3dbb9da51a5abb0447bc04c90c9b
    }
    static void SetAsFunctionHandler(v8::Isolate* isolate,
 diff --git a/net/BUILD.gn b/net/BUILD.gn
-index 62145ac928a694a37cb9fe0e3f48e6cd3ea0b434..e80c04cdeb668d7bb979edd157b9bff45a7bc15e 100644
+index 62145ac928a694a37cb9fe0e3f48e6cd3ea0b434..f70a0404af0024118cdbdd6a15cf76f41ef8179f 100644
 --- a/net/BUILD.gn
 +++ b/net/BUILD.gn
-@@ -62,10 +62,12 @@ config("net_internal_config") {
-     "NET_IMPLEMENTATION",
-   ]
- 
-+  include_dirs = [ "$root_gen_dir" ]
-+
+@@ -65,7 +65,7 @@ config("net_internal_config") {
    if (use_kerberos) {
      defines += [ "USE_KERBEROS" ]
      if (is_android) {
@@ -2121,6 +2116,15 @@ index 62145ac928a694a37cb9fe0e3f48e6cd3ea0b434..e80c04cdeb668d7bb979edd157b9bff4
      }
    }
  
+@@ -1737,6 +1737,8 @@ component("net") {
+       "//third_party/zlib",
+     ]
+ 
++    include_dirs = [ "$root_gen_dir" ]
++
+     if (!use_kerberos) {
+       sources -= [
+         "http/http_auth_handler_negotiate.cc",
 diff --git a/net/http/http_util.cc b/net/http/http_util.cc
 index 95ba606a7e0fa239a9c8c62f19591ec6bb39097a..b4fece0421b282f4042250108426eb502ff9b4c9 100644
 --- a/net/http/http_util.cc
