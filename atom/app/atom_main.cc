@@ -14,6 +14,10 @@
 #include "build/build_config.h"
 #include "content/public/app/content_main.h"
 
+#include "base/strings/string_util.h"
+#include "chrome/common/chrome_switches.h"
+#include "brave/common/brave_paths.h"
+
 #if defined(OS_WIN)
 #include <windows.h>  // windows.h must be included first
 
@@ -31,8 +35,6 @@
 #include "content/public/app/sandbox_helper_win.h"
 #include "sandbox/win/src/sandbox_types.h"
 
-
-#include "chrome/common/chrome_switches.h"
 #include "chrome_elf/chrome_elf_main.h"
 #include "components/crash/content/app/crash_switches.h"
 #include "components/crash/content/app/crashpad.h"
@@ -68,6 +70,8 @@ int main(int argc, const char* argv[]) {
   int64_t exe_entry_point_ticks = 0;
   // const base::TimeTicks exe_entry_point_ticks = base::TimeTicks::Now();
 
+  base::CommandLine::Init(argc, argv_setup);
+
 #if defined(OS_WIN)
   install_static::InitializeFromPrimaryModule();
   MuonCrashReporterClient::InitCrashReporting();
@@ -75,11 +79,44 @@ int main(int argc, const char* argv[]) {
 #endif
 
   // Initialize the CommandLine singleton from the environment.
-  base::CommandLine::Init(0, nullptr);
-  const base::CommandLine* command_line =
+
+  base::CommandLine* command_line =
       base::CommandLine::ForCurrentProcess();
 
+  base::FilePath user_data_dir;
+
+  if (!command_line->HasSwitch(switches::kUserDataDir)) {
+    LOG(ERROR) << "no user data dir";
+    // first check the env
+    std::string user_data_dir_string;
+    std::unique_ptr<base::Environment> environment(base::Environment::Create());
+    if (environment->GetVar("BRAVE_USER_DATA_DIR", &user_data_dir_string) &&
+        base::IsStringUTF8(user_data_dir_string)) {
+      user_data_dir = base::FilePath::FromUTF8Unsafe(user_data_dir_string);
+      command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
+    }
+
+    // next check the user-data-dir switch
+    if (user_data_dir.empty() &&
+        command_line->HasSwitch("user-data-dir-name")) {
+      LOG(ERROR) << "switch value ascii " << command_line->GetSwitchValueASCII("user-data-dir-name");
+      LOG(ERROR) << "switch value path " << command_line->GetSwitchValuePath("user-data-dir-name").value();
+      user_data_dir =
+        command_line->GetSwitchValuePath("user-data-dir-name");
+        LOG(ERROR) << "has name '" << user_data_dir.AsUTF8Unsafe() << "'";
+      if (!user_data_dir.empty() && !user_data_dir.IsAbsolute()) {
+        LOG(ERROR) << "not abnsolute";
+        base::FilePath app_data_dir;
+        brave::GetDefaultAppDataDirectory(&app_data_dir);
+        user_data_dir = app_data_dir.Append(user_data_dir);
+        command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
+      }
+    }
+  }
+
 #if defined(OS_WIN)
+  // base::CommandLine::Init(0, nullptr);
+
   const std::string process_type =
       command_line->GetSwitchValueASCII(switches::kProcessType);
 
@@ -143,11 +180,11 @@ int main(int argc, const char* argv[]) {
   params.argc = argc;
   params.argv = argv;
   atom::AtomCommandLine::Init(argc, argv_setup);
-  base::CommandLine::Init(params.argc, params.argv);
+  // base::CommandLine::Init(params.argc, params.argv);
 #endif  // defined(OS_WIN)
-  base::CommandLine::Init(0, nullptr);
-  command_line = base::CommandLine::ForCurrentProcess();
-  ALLOW_UNUSED_LOCAL(command_line);
+  // base::CommandLine::Init(0, nullptr);
+  // command_line = base::CommandLine::ForCurrentProcess();
+  // ALLOW_UNUSED_LOCAL(command_line);
 
   // if (command_line->HasSwitch(switches::kHeadless)) {
 // #if defined(OS_MACOSX)

@@ -171,11 +171,12 @@ void MuonCrashReporterClient::InitCrashReporting() {
 
   crash_reporter::InitializeCrashpad(initial_client, process_type);
 #elif defined(OS_WIN)
-
+  // SignalInitializeCrashReporting();
   std::wstring process_type = install_static::GetSwitchValueFromCommandLine(
       ::GetCommandLine(), install_static::kProcessType);
   crash_reporter::InitializeCrashpadWithEmbeddedHandler(
       process_type.empty(), install_static::UTF16ToUTF8(process_type));
+  // SignalChromeElf();
 #else
   breakpad::InitCrashReporter(process_type);
 #endif

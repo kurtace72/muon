@@ -148,104 +148,66 @@ base::FilePath InitializeUserDataDir() {
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   base::FilePath user_data_dir;
 
-  if (!command_line->HasSwitch(switches::kUserDataDir)) {
-    // first check the env
-    std::string user_data_dir_string;
-    std::unique_ptr<base::Environment> environment(base::Environment::Create());
-    if (environment->GetVar("BRAVE_USER_DATA_DIR", &user_data_dir_string) &&
-        base::IsStringUTF8(user_data_dir_string)) {
-      user_data_dir = base::FilePath::FromUTF8Unsafe(user_data_dir_string);
-      command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
-    }
+#if defined(OS_WIN)
+  std::string process_type =
+      command_line->GetSwitchValueASCII(::switches::kProcessType);
 
-    // next check the user-data-dir switch
-    if (user_data_dir.empty() ||
-        command_line->HasSwitch("user-data-dir-name")) {
-      user_data_dir =
-        command_line->GetSwitchValuePath("user-data-dir-name");
-      if (!user_data_dir.empty() && !user_data_dir.IsAbsolute()) {
-        base::FilePath app_data_dir;
-        brave::GetDefaultAppDataDirectory(&app_data_dir);
-        user_data_dir = app_data_dir.Append(user_data_dir);
+  if (!process_type.empty()) {
+    wchar_t user_data_dir_buf[MAX_PATH], invalid_user_data_dir_buf[MAX_PATH];
+
+    using GetUserDataDirectoryThunkFunction =
+        void (*)(wchar_t*, size_t, wchar_t*, size_t);
+    HMODULE elf_module = GetModuleHandle(chrome::kChromeElfDllName);
+    if (elf_module) {
+      LOG(ERROR) << "elf module";
+      GetUserDataDirectoryThunkFunction get_user_data_directory_thunk =
+          reinterpret_cast<GetUserDataDirectoryThunkFunction>(
+              GetProcAddress(elf_module, "GetUserDataDirectoryThunk"));
+      get_user_data_directory_thunk(
+          user_data_dir_buf, arraysize(user_data_dir_buf),
+          invalid_user_data_dir_buf, arraysize(invalid_user_data_dir_buf));
+      user_data_dir = base::FilePath(user_data_dir_buf);
+      if (invalid_user_data_dir_buf[0] != 0) {
+      //   chrome::SetInvalidSpecifiedUserDataDir(
+      //       base::FilePath(invalid_user_data_dir_buf));
+        LOG(ERROR) << "invalid user data dir";
         command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
       }
+      LOG(ERROR) << "elf module user data dir " << user_data_dir.AsUTF8Unsafe();
+      // CHECK(PathService::OverrideAndCreateIfNeeded(chrome::DIR_USER_DATA,
+      //                                              user_data_dir, false, true));
     }
   }
+#endif  // OS_WIN
 
-#if defined(OS_WIN)
-  wchar_t user_data_dir_buf[MAX_PATH], invalid_user_data_dir_buf[MAX_PATH];
-
-  using GetUserDataDirectoryThunkFunction =
-      void (*)(wchar_t*, size_t, wchar_t*, size_t);
-  HMODULE elf_module = GetModuleHandle(chrome::kChromeElfDllName);
-  if (elf_module) {
-    LOG(ERROR) << "elf module";
-    GetUserDataDirectoryThunkFunction get_user_data_directory_thunk =
-        reinterpret_cast<GetUserDataDirectoryThunkFunction>(
-            GetProcAddress(elf_module, "GetUserDataDirectoryThunk"));
-    get_user_data_directory_thunk(
-        user_data_dir_buf, arraysize(user_data_dir_buf),
-        invalid_user_data_dir_buf, arraysize(invalid_user_data_dir_buf));
-    user_data_dir = base::FilePath(user_data_dir_buf);
-    if (invalid_user_data_dir_buf[0] != 0) {
-    //   chrome::SetInvalidSpecifiedUserDataDir(
-    //       base::FilePath(invalid_user_data_dir_buf));
-      LOG(ERROR) << "invalid user data dir";
-      command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
-    }
-    LOG(ERROR) << "elf module user data dir " << user_data_dir.MaybeAsASCII();
-    // CHECK(PathService::OverrideAndCreateIfNeeded(chrome::DIR_USER_DATA,
-    //                                              user_data_dir, false, true));
-  }
-#else  // OS_WIN
   if (user_data_dir.empty())
     user_data_dir = command_line->GetSwitchValuePath(switches::kUserDataDir);
-#endif
 
-  LOG(ERROR) << "user data dir " << user_data_dir.MaybeAsASCII();
-  if (!command_line->HasSwitch(switches::kUserDataDir)) {
-    // first check the env
-    std::string user_data_dir_string;
-    std::unique_ptr<base::Environment> environment(base::Environment::Create());
-    if (environment->GetVar("BRAVE_USER_DATA_DIR", &user_data_dir_string) &&
-        base::IsStringUTF8(user_data_dir_string)) {
-      user_data_dir = base::FilePath::FromUTF8Unsafe(user_data_dir_string);
-      command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
-    }
+  LOG(ERROR) << "user data dir " << user_data_dir.AsUTF8Unsafe();
 
-    // next check the user-data-dir switch
-    if (user_data_dir.empty() ||
-        command_line->HasSwitch("user-data-dir-name")) {
-      user_data_dir =
-        command_line->GetSwitchValuePath("user-data-dir-name");
-      if (!user_data_dir.empty() && !user_data_dir.IsAbsolute()) {
-        base::FilePath app_data_dir;
-        brave::GetDefaultAppDataDirectory(&app_data_dir);
-        user_data_dir = app_data_dir.Append(user_data_dir);
-        command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
-      }
-    }
-  } else {
-    user_data_dir =
-        command_line->GetSwitchValuePath(switches::kUserDataDir);
-  }
   // On Windows, trailing separators leave Chrome in a bad state.
   // See crbug.com/464616.
   if (user_data_dir.EndsWithSeparator())
     user_data_dir = user_data_dir.StripTrailingSeparators();
 
-  if (!user_data_dir.empty())
+  if (!user_data_dir.empty()) {
+    LOG(ERROR) << "don't do that";
     PathService::OverrideAndCreateIfNeeded(brightray::DIR_USER_DATA,
           user_data_dir, false, true);
+  }
 
   // TODO(bridiver) Warn and fail early if the process fails
   // to get a user data directory.
-  if (!PathService::Get(brightray::DIR_USER_DATA, &user_data_dir)) {
+  if (!PathService::Get(brightray::DIR_USER_DATA, &user_data_dir) ||
+      user_data_dir.empty()) {
+    LOG(ERROR) << "wtf??";
     brave::GetDefaultUserDataDirectory(&user_data_dir);
     PathService::OverrideAndCreateIfNeeded(brightray::DIR_USER_DATA,
             user_data_dir, false, true);
   }
   PathService::Override(chrome::DIR_USER_DATA, user_data_dir);
+
+  LOG(ERROR) << "default user data dir " << user_data_dir.AsUTF8Unsafe();
 
   // Setup NativeMessagingHosts to point to the default Chrome locations
   // because that's where native apps will create them
@@ -279,6 +241,7 @@ base::FilePath InitializeUserDataDir() {
       native_messaging_dir, false, true);
 #endif  // defined(OS_POSIX)
 
+  LOG(ERROR) << "done";
   return user_data_dir;
 }
 
