@@ -15,8 +15,11 @@
 #include "content/public/app/content_main.h"
 
 #include "base/strings/string_util.h"
+#include "chrome/common/chrome_paths.h"
+#include "chrome/common/chrome_paths_internal.h"
 #include "chrome/common/chrome_switches.h"
-#include "brave/common/brave_paths.h"
+#include "base/path_service.h"
+#include "content/public/common/content_switches.h"
 
 #if defined(OS_WIN)
 #include <windows.h>  // windows.h must be included first
@@ -40,7 +43,6 @@
 #include "components/crash/content/app/crashpad.h"
 #include "components/crash/content/app/fallback_crash_handling_win.h"
 #include "components/crash/content/app/run_as_crashpad_handler_win.h"
-#include "content/public/common/content_switches.h"
 #include "content/public/common/result_codes.h"
 
 #include "chrome_elf/crash/crash_helper.h"
@@ -59,6 +61,7 @@ int ChromeMain(int argc, const char* argv[]);
 int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, wchar_t* cmd, int) {
   int argc = 0;
   wchar_t** argv_setup = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
+  base::CommandLine::Init(0, nullptr);
 #else  // OS_WIN
 #if defined(OS_MACOSX)
 int ChromeMain(int argc, const char* argv[]) {
@@ -66,11 +69,69 @@ int ChromeMain(int argc, const char* argv[]) {
 int main(int argc, const char* argv[]) {
 #endif
   char** argv_setup = uv_setup_args(argc, const_cast<char**>(argv));
+  base::CommandLine::Init(argc, argv_setup);
 #endif  // OS_WIN
   int64_t exe_entry_point_ticks = 0;
   // const base::TimeTicks exe_entry_point_ticks = base::TimeTicks::Now();
 
-  base::CommandLine::Init(argc, argv_setup);
+  const base::CommandLine* command_line =
+      base::CommandLine::ForCurrentProcess();
+
+  base::FilePath user_data_dir;
+
+  const std::string process_type =
+      command_line->GetSwitchValueASCII(switches::kProcessType);
+
+  LOG(ERROR) << "process type " << process_type;
+
+  if (!command_line->HasSwitch(switches::kUserDataDir)) {
+    // first check the env
+    std::string user_data_dir_string;
+    std::unique_ptr<base::Environment> environment(base::Environment::Create());
+    if (environment->GetVar("BRAVE_USER_DATA_DIR", &user_data_dir_string)) {
+      user_data_dir = base::FilePath::FromUTF8Unsafe(user_data_dir_string);
+    }
+
+    if (user_data_dir.empty() && command_line->HasSwitch("user-data-dir-name")) {
+      // next check the user-data-dir switch
+      user_data_dir =
+          command_line->GetSwitchValuePath("user-data-dir-name");
+      if (!user_data_dir.empty() && !user_data_dir.IsAbsolute()) {
+        base::FilePath user_data_dir_parent;
+#if defined(OS_WIN)
+        if (chrome::GetDefaultRoamingUserDataDirectory(&user_data_dir_parent)) {
+#else
+        if (chrome::GetDefaultUserDataDirectory(&user_data_dir_parent)) {
+#endif
+          // move one level up
+          user_data_dir = user_data_dir_parent.DirName().Append(user_data_dir);
+        } else {
+          LOG(ERROR) << "Could not set user-data-dir-name";
+        }
+      }
+    }
+  }
+
+  if (user_data_dir.empty()) {
+#if defined(OS_WIN)
+    chrome::GetDefaultRoamingUserDataDirectory(&user_data_dir);
+#else
+    chrome::GetDefaultUserDataDirectory(&user_data_dir);
+#endif
+  }
+
+  if (!user_data_dir.empty()) {
+    PathService::Override(chrome::DIR_USER_DATA, user_data_dir);
+#if defined(OS_WIN)
+    environment->SetVar(L"APPDATA", user_data_dir_string);
+#endif
+    PathService::Override(chrome::DIR_CRASH_DUMPS,
+#if defined(OS_MACOSX) || defined(OS_WIN)
+        user_data_dir.Append(FILE_PATH_LITERAL("Crashpad")));
+#else
+        user_data_dir.Append(FILE_PATH_LITERAL("Crash Reports")));
+#endif
+  }
 
 #if defined(OS_WIN)
   install_static::InitializeFromPrimaryModule();
@@ -80,45 +141,12 @@ int main(int argc, const char* argv[]) {
 
   // Initialize the CommandLine singleton from the environment.
 
-  base::CommandLine* command_line =
-      base::CommandLine::ForCurrentProcess();
-
-  base::FilePath user_data_dir;
-
-  if (!command_line->HasSwitch(switches::kUserDataDir)) {
-    LOG(ERROR) << "no user data dir";
-    // first check the env
-    std::string user_data_dir_string;
-    std::unique_ptr<base::Environment> environment(base::Environment::Create());
-    if (environment->GetVar("BRAVE_USER_DATA_DIR", &user_data_dir_string) &&
-        base::IsStringUTF8(user_data_dir_string)) {
-      user_data_dir = base::FilePath::FromUTF8Unsafe(user_data_dir_string);
-      command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
-    }
-
-    // next check the user-data-dir switch
-    if (user_data_dir.empty() &&
-        command_line->HasSwitch("user-data-dir-name")) {
-      LOG(ERROR) << "switch value ascii " << command_line->GetSwitchValueASCII("user-data-dir-name");
-      LOG(ERROR) << "switch value path " << command_line->GetSwitchValuePath("user-data-dir-name").value();
-      user_data_dir =
-        command_line->GetSwitchValuePath("user-data-dir-name");
-        LOG(ERROR) << "has name '" << user_data_dir.AsUTF8Unsafe() << "'";
-      if (!user_data_dir.empty() && !user_data_dir.IsAbsolute()) {
-        LOG(ERROR) << "not abnsolute";
-        base::FilePath app_data_dir;
-        brave::GetDefaultAppDataDirectory(&app_data_dir);
-        user_data_dir = app_data_dir.Append(user_data_dir);
-        command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
-      }
-    }
-  }
 
 #if defined(OS_WIN)
   // base::CommandLine::Init(0, nullptr);
 
-  const std::string process_type =
-      command_line->GetSwitchValueASCII(switches::kProcessType);
+  // const std::string process_type =
+  //     command_line->GetSwitchValueASCII(switches::kProcessType);
 
   // Confirm that an explicit prefetch profile is used for all process types
   // except for the browser process. Any new process type will have to assign

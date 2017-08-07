@@ -15,7 +15,6 @@
 #include "brave/browser/brave_content_browser_client.h"
 #include "brave/browser/component_updater/brave_component_updater_configurator.h"
 #include "brave/browser/memory/guest_tab_manager.h"
-#include "brightray/browser/brightray_paths.h"
 #include "chrome/browser/background/background_mode_manager.h"
 #include "chrome/browser/browser_shutdown.h"
 #include "chrome/browser/prefs/chrome_command_line_pref_store.h"
@@ -120,7 +119,7 @@ void BrowserProcessImpl::CreateProfileManager() {
   created_profile_manager_ = true;
 
   base::FilePath user_data_dir;
-  PathService::Get(brightray::DIR_USER_DATA, &user_data_dir);
+  PathService::Get(chrome::DIR_USER_DATA, &user_data_dir);
   profile_manager_.reset(new ProfileManager(user_data_dir));
 }
 

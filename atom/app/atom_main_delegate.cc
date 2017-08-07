@@ -25,10 +25,8 @@
 #include "base/logging.h"
 #include "base/path_service.h"
 #include "base/trace_event/trace_log.h"
-#include "brave/common/brave_paths.h"
-#include "brightray/browser/brightray_paths.h"
+#include "chrome/common/chrome_paths_internal.h"
 #include "brightray/common/application_info.h"
-#include "browser/brightray_paths.h"
 #include "chrome/child/child_profiling.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_paths.h"
@@ -152,7 +150,7 @@ base::FilePath InitializeUserDataDir() {
   std::string process_type =
       command_line->GetSwitchValueASCII(::switches::kProcessType);
 
-  if (!process_type.empty()) {
+  // if (!process_type.empty()) {
     wchar_t user_data_dir_buf[MAX_PATH], invalid_user_data_dir_buf[MAX_PATH];
 
     using GetUserDataDirectoryThunkFunction =
@@ -177,43 +175,28 @@ base::FilePath InitializeUserDataDir() {
       // CHECK(PathService::OverrideAndCreateIfNeeded(chrome::DIR_USER_DATA,
       //                                              user_data_dir, false, true));
     }
-  }
+  // }
 #endif  // OS_WIN
 
-  if (user_data_dir.empty())
+  if (user_data_dir.empty() && command_line->HasSwitch(switches::kUserDataDir))
     user_data_dir = command_line->GetSwitchValuePath(switches::kUserDataDir);
-
-  LOG(ERROR) << "user data dir " << user_data_dir.AsUTF8Unsafe();
 
   // On Windows, trailing separators leave Chrome in a bad state.
   // See crbug.com/464616.
   if (user_data_dir.EndsWithSeparator())
     user_data_dir = user_data_dir.StripTrailingSeparators();
 
-  if (!user_data_dir.empty()) {
-    LOG(ERROR) << "don't do that";
-    PathService::OverrideAndCreateIfNeeded(brightray::DIR_USER_DATA,
-          user_data_dir, false, true);
-  }
+  if (user_data_dir.empty())
+    chrome::GetDefaultUserDataDirectory(&user_data_dir);
 
-  // TODO(bridiver) Warn and fail early if the process fails
-  // to get a user data directory.
-  if (!PathService::Get(brightray::DIR_USER_DATA, &user_data_dir) ||
-      user_data_dir.empty()) {
-    LOG(ERROR) << "wtf??";
-    brave::GetDefaultUserDataDirectory(&user_data_dir);
-    PathService::OverrideAndCreateIfNeeded(brightray::DIR_USER_DATA,
-            user_data_dir, false, true);
-  }
-  PathService::Override(chrome::DIR_USER_DATA, user_data_dir);
-
-  LOG(ERROR) << "default user data dir " << user_data_dir.AsUTF8Unsafe();
+  PathService::OverrideAndCreateIfNeeded(chrome::DIR_USER_DATA, user_data_dir,
+      false, true);
 
   // Setup NativeMessagingHosts to point to the default Chrome locations
   // because that's where native apps will create them
 #if defined(OS_POSIX)
   base::FilePath default_user_data_dir;
-  brave::GetDefaultUserDataDirectory(&default_user_data_dir);
+  chrome::GetDefaultUserDataDirectory(&default_user_data_dir);
   std::vector<base::FilePath::StringType> components;
   default_user_data_dir.GetComponents(&components);
   // remove "brave"

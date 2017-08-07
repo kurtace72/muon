@@ -590,6 +590,22 @@ index 94cdc2aeb7398a433b9afcfbbcfa87dd1e57b65d..9263f1283ffe964eec8a479f7a1b7de6
  const base::FilePath::CharType kChromeElfDllName[] = FPL("chrome_elf.dll");
  const base::FilePath::CharType kStatusTrayWindowClass[] =
      FPL("Chrome_StatusTrayWindow");
+diff --git a/chrome/common/chrome_paths_linux.cc b/chrome/common/chrome_paths_linux.cc
+index aa26cc9bbb90e53d727af4f3d55ee6472b766654..15940a09c4dfece70dae3527e1279c7cde8601fa 100644
+--- a/chrome/common/chrome_paths_linux.cc
++++ b/chrome/common/chrome_paths_linux.cc
+@@ -68,8 +68,10 @@ bool GetDefaultUserDataDirectory(base::FilePath* result) {
+                                             kDotConfigDir));
+ #if defined(GOOGLE_CHROME_BUILD)
+   *result = config_dir.Append("google-chrome");
+-#else
++#elif defined(MUON_CHROMIUM_BUILD)
+   *result = config_dir.Append("chromium");
++#else
++  *result = config_dir.Append("brave");
+ #endif
+   return true;
+ }
 diff --git a/chrome/common/chrome_paths_mac.mm b/chrome/common/chrome_paths_mac.mm
 index d0bbbf72ff0e356e424dc280eeb1441c990b5770..8e96ea5706f87ea98ba55fcb583b16a8035fa903 100644
 --- a/chrome/common/chrome_paths_mac.mm

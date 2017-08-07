@@ -11,12 +11,12 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "brave/browser/brave_permission_manager.h"
-#include "brightray/browser/brightray_paths.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/custom_handlers/protocol_handler_registry.h"
 #include "chrome/browser/custom_handlers/protocol_handler_registry_factory.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/common/chrome_paths.h"
 #include "chrome/common/pref_names.h"
 #include "common/application_info.h"
 #include "components/autofill/core/browser/autofill_manager.h"
@@ -669,7 +669,7 @@ AtomBrowserContext* AtomBrowserContext::From(
   // TODO(bridiver) - pass the path to initialize the browser context
   // TODO(bridiver) - create these with the profile manager
   base::FilePath path;
-  PathService::Get(brightray::DIR_USER_DATA, &path);
+  PathService::Get(chrome::DIR_USER_DATA, &path);
   if (!in_memory && !partition.empty())
     path = path.Append(FILE_PATH_LITERAL("Partitions"))
                  .Append(base::FilePath::FromUTF8Unsafe(

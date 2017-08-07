@@ -25,7 +25,6 @@
 #include "base/profiler/stack_sampling_profiler.h"
 #include "base/threading/thread_task_runner_handle.h"
 #include "base/time/default_tick_clock.h"
-#include "brightray/browser/brightray_paths.h"
 #include "browser/media/media_capture_devices_dispatcher.h"
 #include "chrome/browser/browser_process_impl.h"
 #include "chrome/browser/browser_shutdown.h"
@@ -33,6 +32,7 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/webui/chrome_web_ui_controller_factory.h"
 #include "chrome/common/chrome_constants.h"
+#include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
 #include "components/metrics/profiler/content/content_tracking_synchronizer_delegate.h"
 #include "components/metrics/profiler/tracking_synchronizer.h"
@@ -311,7 +311,7 @@ void AtomBrowserMainParts::PreMainMessageLoopRun() {
 
   // Make sure the userData directory is created.
   base::FilePath user_data;
-  if (PathService::Get(brightray::DIR_USER_DATA, &user_data))
+  if (PathService::Get(chrome::DIR_USER_DATA, &user_data))
     base::CreateDirectoryAndGetError(user_data, nullptr);
 
   // PreProfileInit
