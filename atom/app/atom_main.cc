@@ -119,6 +119,8 @@ int main(int argc, const char* argv[]) {
   if (user_data_dir.empty()) {
 #if defined(OS_WIN)
     chrome::GetDefaultRoamingUserDataDirectory(&user_data_dir);
+    // get rid of kUserDataDirname
+    user_data_dir = user_data_dir.DirName();
 #else
     chrome::GetDefaultUserDataDirectory(&user_data_dir);
 #endif
@@ -127,9 +129,10 @@ int main(int argc, const char* argv[]) {
   LOG(ERROR) << "user_data_dir 2 " << user_data_dir.value();
 
   if (!user_data_dir.empty()) {
-    SetEnvironmentString16(L"MUON_USER_DATA_DIR_NAME",
+#if defined(OS_WIN)
+    SetEnvironmentVariable(L"MUON_USER_DATA_DIR_NAME",
         user_data_dir.BaseName().value().c_str());
-    PathService::Override(base::DIR_LOCAL_APP_DATA, user_data_dir.DirName());
+#endif
     PathService::Override(chrome::DIR_USER_DATA, user_data_dir);
   }
 

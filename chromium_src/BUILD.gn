@@ -63,6 +63,12 @@ source_set("app") {
     "//content/public/common",
   ]
 
+  if (is_win) {
+    deps += [
+      "//chrome_elf",
+    ]
+  }
+
   if (is_linux) {
     deps += [
       "//components/upload_list",

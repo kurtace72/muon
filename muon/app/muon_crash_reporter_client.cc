@@ -145,19 +145,19 @@ void MuonCrashReporterClient::InitCrashReporting() {
   if (instance)
     return;
 
-  if (!IsCrashReportingEnabled()) {
-    LOG(ERROR) << "Crash reporting is disabled";
-    return;
-  } else {
-    LOG(ERROR) << "enabling crash reporting";
-  }
+  // if (!IsCrashReportingEnabled()) {
+  //   LOG(ERROR) << "Crash reporting is disabled";
+  //   return;
+  // } else {
+  //   LOG(ERROR) << "enabling crash reporting";
+  // }
 
-  // crash_keys::SetCrashKeysFromCommandLine(*command_line);
+  auto command_line = base::CommandLine::ForCurrentProcess();
+  crash_keys::SetCrashKeysFromCommandLine(*command_line);
   instance = new MuonCrashReporterClient();
   ANNOTATE_LEAKING_OBJECT_PTR(crash_client);
 
 #if defined(OS_MACOSX)
-  auto command_line = base::CommandLine::ForCurrentProcess();
   std::string process_type = command_line->GetSwitchValueASCII(
       ::switches::kProcessType);
 

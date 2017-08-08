@@ -34,6 +34,7 @@
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
+#include "chrome/common/chrome_result_codes.h"
 #include "components/metrics/profiler/content/content_tracking_synchronizer_delegate.h"
 #include "components/metrics/profiler/tracking_synchronizer.h"
 #include "components/prefs/json_pref_store.h"
@@ -56,12 +57,16 @@
 #if defined(USE_X11)
 #include "chrome/browser/ui/libgtkui/gtk_util.h"
 #include "ui/events/devices/x11/touch_factory_x11.h"
+#include "ui/views/linux_ui/linux_ui.h"
 #endif
 
 #if defined(USE_AURA)
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "content/public/common/service_manager_connection.h"
 #include "services/service_manager/runner/common/client_util.h"
+#include "ui/display/display.h"
+#include "ui/display/screen.h"
+#include "ui/views/widget/desktop_aura/desktop_screen.h"
 #endif
 
 #if defined(OS_WIN)
@@ -70,7 +75,33 @@
 #include "base/win/win_util.h"
 #include "base/win/windows_version.h"
 #include "base/win/wrapped_window_proc.h"
+// #include "chrome/browser/win/chrome_elf_init.h"
 #endif
+
+
+
+// #if defined(USE_AURA)
+//
+// #endif
+
+// #if defined(TOOLKIT_VIEWS)
+// #include "browser/views/views_delegate.h"
+// #include "chrome/browser/ui/views/harmony/harmony_layout_provider.h"
+// #endif
+
+// #if defined(USE_X11)
+// #include "base/environment.h"
+// #include "base/path_service.h"
+// #include "base/nix/xdg_util.h"
+// #include "base/threading/thread_task_runner_handle.h"
+// #include "chrome/browser/ui/libgtkui/gtk_ui.h"
+// #include "ui/base/x/x11_util.h"
+// #include "ui/base/x/x11_util_internal.h"
+
+// #include "ui/wm/core/wm_state.h"
+// #endif
+
+
 
 namespace atom {
 
@@ -174,7 +205,12 @@ void AtomBrowserMainParts::PreEarlyInitialization() {
 }
 
 int AtomBrowserMainParts::PreCreateThreads() {
+  LOG(ERROR) << "PreCreateThreads";
   TRACE_EVENT0("startup", "AtomBrowserMainParts::PreCreateThreads")
+
+  base::FilePath user_data_dir;
+  if (!PathService::Get(chrome::DIR_USER_DATA, &user_data_dir))
+    return chrome::RESULT_CODE_MISSING_DATA;
 
   // Force MediaCaptureDevicesDispatcher to be created on UI thread.
   brightray::MediaCaptureDevicesDispatcher::GetInstance();
@@ -230,7 +266,17 @@ int AtomBrowserMainParts::PreCreateThreads() {
 
   MuonCrashReporterClient::InitCrashReporting();
 
-  return BrowserMainParts::PreCreateThreads();
+#if defined(USE_AURA)
+  // The screen may have already been set in test initialization.
+  if (!display::Screen::GetScreen())
+    display::Screen::SetScreenInstance(views::CreateDesktopScreen());
+#if defined(USE_X11)
+  views::LinuxUI::instance()->UpdateDeviceScaleFactor();
+#endif
+#endif
+  LOG(ERROR) << "PreCreateThreads done";
+
+  return content::RESULT_CODE_NORMAL_EXIT;;
 }
 
 void AtomBrowserMainParts::PostEarlyInitialization() {
@@ -255,15 +301,18 @@ void AtomBrowserMainParts::IdleHandler() {
 
 #if defined(OS_WIN)
 void AtomBrowserMainParts::PreMainMessageLoopStart() {
+  LOG(ERROR) << "PreMainMessageLoopStart";
   brightray::BrowserMainParts::PreMainMessageLoopStart();
   if (!parameters_.ui_task) {
     // Make sure that we know how to handle exceptions from the message loop.
     InitializeWindowProcExceptions();
   }
+  LOG(ERROR) << "PreMainMessageLoopStart done";
 }
 #endif
 
 void AtomBrowserMainParts::PreMainMessageLoopRun() {
+  LOG(ERROR) << "PreMainMessageLoopRun";
 #if defined(USE_AURA)
   if (content::ServiceManagerConnection::GetForProcess() &&
       service_manager::ServiceManagerIsRemote()) {
@@ -272,90 +321,122 @@ void AtomBrowserMainParts::PreMainMessageLoopRun() {
   }
 #endif
 
+// #if defined(OS_WIN)
+//   InitializeChromeElf();
+// #endif
+
+  LOG(ERROR) << "PreMainMessageLoopRun 1";
   fake_browser_process_->PreMainMessageLoopRun();
 
+  LOG(ERROR) << "PreMainMessageLoopRun 2";
   content::WebUIControllerFactory::RegisterFactory(
       ChromeWebUIControllerFactory::GetInstance());
 
+  LOG(ERROR) << "PreMainMessageLoopRun 3";
   js_env_.reset(new JavascriptEnvironment);
+  LOG(ERROR) << "PreMainMessageLoopRun 3.5";
   js_env_->isolate()->Enter();
 
+  LOG(ERROR) << "PreMainMessageLoopRun 4";
   node_bindings_->Initialize();
 
+  LOG(ERROR) << "PreMainMessageLoopRun 5";
   // Create the global environment.
   node::Environment* env =
       node_bindings_->CreateEnvironment(js_env_->context());
 
+      LOG(ERROR) << "PreMainMessageLoopRun 6";
   // Add atom-shell extended APIs.
   atom_bindings_->BindTo(js_env_->isolate(), env->process_object());
 
+  LOG(ERROR) << "PreMainMessageLoopRun 7";
   // Load everything.
   node_bindings_->LoadEnvironment(env);
 
+  LOG(ERROR) << "PreMainMessageLoopRun 8";
   // Wrap the uv loop with global env.
   node_bindings_->set_uv_env(env);
 
+  LOG(ERROR) << "PreMainMessageLoopRun 9";
 #if defined(USE_X11)
   ui::TouchFactory::SetTouchDeviceListFromCommandLine();
 #endif
 
+  LOG(ERROR) << "PreMainMessageLoopRun 10";
   // Start idle gc.
   gc_timer_.Start(
       FROM_HERE, base::TimeDelta::FromMinutes(1),
       base::Bind(&AtomBrowserMainParts::IdleHandler,
                  base::Unretained(this)));
 
+  LOG(ERROR) << "PreMainMessageLoopRun 11";
   memory_pressure_listener_.reset(new base::MemoryPressureListener(
       base::Bind(&AtomBrowserMainParts::OnMemoryPressure,
         base::Unretained(this))));
 
+  LOG(ERROR) << "PreMainMessageLoopRun 12";
   // Make sure the userData directory is created.
   base::FilePath user_data;
   if (PathService::Get(chrome::DIR_USER_DATA, &user_data))
     base::CreateDirectoryAndGetError(user_data, nullptr);
 
+  LOG(ERROR) << "PreMainMessageLoopRun 13";
   // PreProfileInit
   EnsureBrowserContextKeyedServiceFactoriesBuilt();
 
+  LOG(ERROR) << "PreMainMessageLoopRun 14";
   browser_context_ = ProfileManager::GetActiveUserProfile();
   brightray::BrowserMainParts::PreMainMessageLoopRun();
 
+  LOG(ERROR) << "PreMainMessageLoopRun 15";
   js_env_->OnMessageLoopCreated();
+  LOG(ERROR) << "PreMainMessageLoopRun 16";
   node_bindings_->PrepareMessageLoop();
+  LOG(ERROR) << "PreMainMessageLoopRun 17";
   node_bindings_->RunMessageLoop();
 
+  LOG(ERROR) << "PreMainMessageLoopRun 18";
 #if defined(USE_X11)
   libgtkui::GtkInitFromCommandLine(*base::CommandLine::ForCurrentProcess());
 #endif
 
+  LOG(ERROR) << "PreMainMessageLoopRun 19";
 #if !defined(OS_MACOSX)
   // The corresponding call in macOS is in AtomApplicationDelegate.
   Browser::Get()->WillFinishLaunching();
+  LOG(ERROR) << "PreMainMessageLoopRun 20";
   std::unique_ptr<base::DictionaryValue> empty_info(new base::DictionaryValue);
+  LOG(ERROR) << "PreMainMessageLoopRun 21";
   Browser::Get()->DidFinishLaunching(*empty_info);
 #endif
 
+  LOG(ERROR) << "PreMainMessageLoopRun 22";
   // we want to allow the app to override the command line before running this
   auto command_line = base::CommandLine::ForCurrentProcess();
   // auto feature_list = base::FeatureList::GetInstance();
   base::FeatureList::InitializeInstance(
       command_line->GetSwitchValueASCII(switches::kEnableFeatures),
       command_line->GetSwitchValueASCII(switches::kDisableFeatures));
+  LOG(ERROR) << "PreMainMessageLoopRun done";
 }
 
 bool AtomBrowserMainParts::MainMessageLoopRun(int* result_code) {
+  LOG(ERROR) << "MainMessageLoopRun";
   exit_code_ = result_code;
   return brightray::BrowserMainParts::MainMessageLoopRun(result_code);
 }
 
 void AtomBrowserMainParts::PostMainMessageLoopStart() {
+  LOG(ERROR) << "PostMainMessageLoopStart";
   brightray::BrowserMainParts::PostMainMessageLoopStart();
 #if defined(OS_POSIX)
   HandleShutdownSignals();
 #endif
+  LOG(ERROR) << "PostMainMessageLoopStart done";
 }
 
 void AtomBrowserMainParts::PostMainMessageLoopRun() {
+  LOG(ERROR) << "PostMainMessageLoopRun";
   browser_context_ = nullptr;
   brightray::BrowserMainParts::PostMainMessageLoopRun();
 
@@ -380,6 +461,7 @@ void AtomBrowserMainParts::PostMainMessageLoopRun() {
   restart_last_session_ = browser_shutdown::ShutdownPreThreadsStop();
 
   fake_browser_process_->StartTearDown();
+  LOG(ERROR) << "PostMainMessageLoopRun done";
 }
 
 void AtomBrowserMainParts::PostDestroyThreads() {

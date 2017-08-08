@@ -146,11 +146,13 @@ base::FilePath InitializeUserDataDir() {
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   base::FilePath user_data_dir;
 
+  PathService::Get(chrome::DIR_USER_DATA, &user_data_dir);
+
 #if defined(OS_WIN)
   std::string process_type =
       command_line->GetSwitchValueASCII(::switches::kProcessType);
 
-  // if (!process_type.empty()) {
+//   // if (!process_type.empty()) {
     wchar_t user_data_dir_buf[MAX_PATH], invalid_user_data_dir_buf[MAX_PATH];
 
     using GetUserDataDirectoryThunkFunction =
@@ -164,22 +166,23 @@ base::FilePath InitializeUserDataDir() {
       get_user_data_directory_thunk(
           user_data_dir_buf, arraysize(user_data_dir_buf),
           invalid_user_data_dir_buf, arraysize(invalid_user_data_dir_buf));
-      user_data_dir = base::FilePath(user_data_dir_buf);
+      base::FilePath local_user_data_dir = base::FilePath(user_data_dir_buf);
       if (invalid_user_data_dir_buf[0] != 0) {
       //   chrome::SetInvalidSpecifiedUserDataDir(
       //       base::FilePath(invalid_user_data_dir_buf));
         LOG(ERROR) << "invalid user data dir";
         // command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
       }
-      LOG(ERROR) << "elf module user data dir " << user_data_dir.AsUTF8Unsafe();
-      // CHECK(PathService::OverrideAndCreateIfNeeded(chrome::DIR_USER_DATA,
-      //                                              user_data_dir, false, true));
+      LOG(ERROR) << "elf module local_user_data_dir user data dir " << local_user_data_dir.AsUTF8Unsafe();
+      CHECK(PathService::OverrideAndCreateIfNeeded(base::DIR_LOCAL_APP_DATA,
+                                                   local_user_data_dir, false, true));
     }
   // }
 #endif  // OS_WIN
 
-  if (user_data_dir.empty() && command_line->HasSwitch(switches::kUserDataDir))
+  if (command_line->HasSwitch(switches::kUserDataDir)) {
     user_data_dir = command_line->GetSwitchValuePath(switches::kUserDataDir);
+  }
 
   // On Windows, trailing separators leave Chrome in a bad state.
   // See crbug.com/464616.
@@ -187,7 +190,13 @@ base::FilePath InitializeUserDataDir() {
     user_data_dir = user_data_dir.StripTrailingSeparators();
 
   if (user_data_dir.empty())
+#if defined(OS_WIN)
+    chrome::GetDefaultRoamingUserDataDirectory(&user_data_dir);
+    // get rid of kUserDataDirname
+    user_data_dir = user_data_dir.DirName();
+#else
     chrome::GetDefaultUserDataDirectory(&user_data_dir);
+#endif
 
   PathService::OverrideAndCreateIfNeeded(chrome::DIR_USER_DATA, user_data_dir,
       false, true);
@@ -196,6 +205,7 @@ base::FilePath InitializeUserDataDir() {
   // because that's where native apps will create them
 #if defined(OS_POSIX)
   base::FilePath default_user_data_dir;
+  // this is the chrome path so don't use roaming for win
   chrome::GetDefaultUserDataDirectory(&default_user_data_dir);
   std::vector<base::FilePath::StringType> components;
   default_user_data_dir.GetComponents(&components);
@@ -304,7 +314,6 @@ bool AtomMainDelegate::BasicStartupComplete(int* exit_code) {
 void AtomMainDelegate::PreSandboxStartup() {
 #if defined(OS_WIN)
   install_static::InitializeProcessType();
-  child_process_logging::Init();
 #endif
 
   base::FilePath path = InitializeUserDataDir();
@@ -325,6 +334,8 @@ void AtomMainDelegate::PreSandboxStartup() {
 #if !defined(OS_WIN)
   // For windows we call InitLogging when the sandbox is initialized.
   InitLogging(process_type);
+#else
+  child_process_logging::Init();
 #endif
 
   // Set google API key.

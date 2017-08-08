@@ -231,17 +231,6 @@ void BrowserMainParts::PostMainMessageLoopRun() {
   DevToolsManagerDelegate::StopHttpHandler();
 }
 
-int BrowserMainParts::PreCreateThreads() {
-#if defined(USE_AURA)
-  display::Screen* screen = views::CreateDesktopScreen();
-  display::Screen::SetScreenInstance(screen);
-#if defined(USE_X11)
-  views::LinuxUI::instance()->UpdateDeviceScaleFactor();
-#endif
-#endif
-  return 0;
-}
-
 void BrowserMainParts::PostDestroyThreads() {
 #if defined(OS_LINUX)
   device::BluetoothAdapterFactory::Shutdown();
