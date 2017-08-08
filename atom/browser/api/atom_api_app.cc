@@ -389,8 +389,6 @@ namespace {
 int GetPathConstant(const std::string& name) {
   if (name == "userData")
     return chrome::DIR_USER_DATA;
-  else if (name == "cache")
-    return base::DIR_CACHE;
   else if (name == "home")
     return base::DIR_HOME;
   else if (name == "temp")

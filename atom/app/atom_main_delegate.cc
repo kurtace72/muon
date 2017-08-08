@@ -169,7 +169,7 @@ base::FilePath InitializeUserDataDir() {
       //   chrome::SetInvalidSpecifiedUserDataDir(
       //       base::FilePath(invalid_user_data_dir_buf));
         LOG(ERROR) << "invalid user data dir";
-        command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
+        // command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
       }
       LOG(ERROR) << "elf module user data dir " << user_data_dir.AsUTF8Unsafe();
       // CHECK(PathService::OverrideAndCreateIfNeeded(chrome::DIR_USER_DATA,

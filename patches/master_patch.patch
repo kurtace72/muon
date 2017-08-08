@@ -787,6 +787,28 @@ index b51284b707dba9393c1edbf7eff413e04bb57d40..358efde9a981136548054f54c7bb1639
    } else {
      sources += [
        "chromium_install_modes.cc",
+diff --git a/chrome/install_static/install_util.cc b/chrome/install_static/install_util.cc
+index 0d3054fa19022bf85eaccb95fbcb88343ec9cc51..a10c10619190d9c5e8ec2f404231fd55fa04d982 100644
+--- a/chrome/install_static/install_util.cc
++++ b/chrome/install_static/install_util.cc
+@@ -475,6 +475,7 @@ bool SetCollectStatsInSample(bool in_sample) {
+ std::wstring& AppendChromeInstallSubDirectory(const InstallConstants& mode,
+                                               bool include_suffix,
+                                               std::wstring* path) {
++#if defined(MUON_CHROMIUM_BUILD)
+   if (*kCompanyPathName) {
+     path->append(kCompanyPathName);
+     path->push_back(L'\\');
+@@ -483,6 +484,9 @@ std::wstring& AppendChromeInstallSubDirectory(const InstallConstants& mode,
+   if (!include_suffix)
+     return *path;
+   return path->append(mode.install_suffix);
++#else
++  return path->append(GetEnvironmentString16(L"MUON_USER_DATA_DIR_NAME"));
++#endif
+ }
+ 
+ bool ReportingIsEnforcedByPolicy(bool* crash_reporting_enabled) {
 diff --git a/chrome/installer/util/prebuild/create_string_rc.py b/chrome/installer/util/prebuild/create_string_rc.py
 index ce885e05e62af97777314397c79d1f05aa0dc36a..c2b8a35bfdbd6a23ce288b2007dcb8ce7fee8657 100755
 --- a/chrome/installer/util/prebuild/create_string_rc.py

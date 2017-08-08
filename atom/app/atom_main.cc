@@ -62,6 +62,8 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, wchar_t* cmd, int) {
   int argc = 0;
   wchar_t** argv_setup = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
   base::CommandLine::Init(0, nullptr);
+
+  install_static::InitializeFromPrimaryModule();
 #else  // OS_WIN
 #if defined(OS_MACOSX)
 int ChromeMain(int argc, const char* argv[]) {
@@ -86,8 +88,8 @@ int main(int argc, const char* argv[]) {
 
   if (!command_line->HasSwitch(switches::kUserDataDir)) {
     // first check the env
-    std::string user_data_dir_string;
     std::unique_ptr<base::Environment> environment(base::Environment::Create());
+    std::string user_data_dir_string;
     if (environment->GetVar("BRAVE_USER_DATA_DIR", &user_data_dir_string)) {
       user_data_dir = base::FilePath::FromUTF8Unsafe(user_data_dir_string);
     }
@@ -112,6 +114,8 @@ int main(int argc, const char* argv[]) {
     }
   }
 
+  LOG(ERROR) << "user_data_dir 1 " << user_data_dir.value();
+
   if (user_data_dir.empty()) {
 #if defined(OS_WIN)
     chrome::GetDefaultRoamingUserDataDirectory(&user_data_dir);
@@ -120,21 +124,16 @@ int main(int argc, const char* argv[]) {
 #endif
   }
 
+  LOG(ERROR) << "user_data_dir 2 " << user_data_dir.value();
+
   if (!user_data_dir.empty()) {
+    SetEnvironmentString16(L"MUON_USER_DATA_DIR_NAME",
+        user_data_dir.BaseName().value().c_str());
+    PathService::Override(base::DIR_LOCAL_APP_DATA, user_data_dir.DirName());
     PathService::Override(chrome::DIR_USER_DATA, user_data_dir);
-#if defined(OS_WIN)
-    environment->SetVar(L"APPDATA", user_data_dir_string);
-#endif
-    PathService::Override(chrome::DIR_CRASH_DUMPS,
-#if defined(OS_MACOSX) || defined(OS_WIN)
-        user_data_dir.Append(FILE_PATH_LITERAL("Crashpad")));
-#else
-        user_data_dir.Append(FILE_PATH_LITERAL("Crash Reports")));
-#endif
   }
 
 #if defined(OS_WIN)
-  install_static::InitializeFromPrimaryModule();
   MuonCrashReporterClient::InitCrashReporting();
   SignalInitializeCrashReporting();
 #endif
