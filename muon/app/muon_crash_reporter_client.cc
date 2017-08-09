@@ -56,8 +56,6 @@ const char kCrashpadUpdateConsentFunctionName[] = "SetUploadConsentImpl";
 using metrics::MetricsServiceAccessor;
 
 MuonCrashReporterClient::MuonCrashReporterClient() {
-  LOG(ERROR) << "set crash reporter client";
-  crash_reporter::SetCrashReporterClient(this);
 }
 
 MuonCrashReporterClient::~MuonCrashReporterClient() {}
@@ -145,17 +143,13 @@ void MuonCrashReporterClient::InitCrashReporting() {
   if (instance)
     return;
 
-  // if (!IsCrashReportingEnabled()) {
-  //   LOG(ERROR) << "Crash reporting is disabled";
-  //   return;
-  // } else {
-  //   LOG(ERROR) << "enabling crash reporting";
-  // }
+  LOG(ERROR) << "create instance";
+
+  instance = new MuonCrashReporterClient();
+  ANNOTATE_LEAKING_OBJECT_PTR(instance);
+  crash_reporter::SetCrashReporterClient(instance);
 
   auto command_line = base::CommandLine::ForCurrentProcess();
-  crash_keys::SetCrashKeysFromCommandLine(*command_line);
-  instance = new MuonCrashReporterClient();
-  ANNOTATE_LEAKING_OBJECT_PTR(crash_client);
 
 #if defined(OS_MACOSX)
   std::string process_type = command_line->GetSwitchValueASCII(
@@ -171,17 +165,17 @@ void MuonCrashReporterClient::InitCrashReporting() {
 
   crash_reporter::InitializeCrashpad(initial_client, process_type);
 #elif defined(OS_WIN)
-  // SignalInitializeCrashReporting();
   std::wstring process_type = install_static::GetSwitchValueFromCommandLine(
       ::GetCommandLine(), install_static::kProcessType);
+  LOG(ERROR) << "InitializeCrashpadWithEmbeddedHandler " << process_type;
   crash_reporter::InitializeCrashpadWithEmbeddedHandler(
       process_type.empty(), install_static::UTF16ToUTF8(process_type));
-  // SignalChromeElf();
 #else
   breakpad::InitCrashReporter(process_type);
 #endif
 
   SetCrashReportingEnabledForProcess(true);
+  crash_keys::SetCrashKeysFromCommandLine(*command_line);
 }
 
 //  static
@@ -258,7 +252,7 @@ void MuonCrashReporterClient::InitForProcess() {
       ::switches::kProcessType);
 
   if (process_type.empty()) {
-    LOG(ERROR) << "empty :(";
+    LOG(ERROR) << "no init for browser process";
     return;
   }
 #if defined(OS_POSIX) && !defined(OS_MACOSX)
@@ -271,7 +265,6 @@ void MuonCrashReporterClient::InitForProcess() {
   }
 #endif
 
-  LOG(ERROR) << "calling init crash reporter";
   InitCrashReporting();
 }
 

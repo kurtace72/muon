@@ -57,34 +57,9 @@ int ChromeMain(int argc, const char* argv[]);
 }
 #endif  // OS_MACOSX
 
-#if defined(OS_WIN)
-int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, wchar_t* cmd, int) {
-  int argc = 0;
-  wchar_t** argv_setup = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
-  base::CommandLine::Init(0, nullptr);
-
-  install_static::InitializeFromPrimaryModule();
-#else  // OS_WIN
-#if defined(OS_MACOSX)
-int ChromeMain(int argc, const char* argv[]) {
-#else  // OS_MACOSX
-int main(int argc, const char* argv[]) {
-#endif
-  char** argv_setup = uv_setup_args(argc, const_cast<char**>(argv));
-  base::CommandLine::Init(argc, argv_setup);
-#endif  // OS_WIN
-  int64_t exe_entry_point_ticks = 0;
-  // const base::TimeTicks exe_entry_point_ticks = base::TimeTicks::Now();
-
-  const base::CommandLine* command_line =
-      base::CommandLine::ForCurrentProcess();
-
+void FixUserDataDir(const base::CommandLine* command_line,
+                    const std::string process_type) {
   base::FilePath user_data_dir;
-
-  const std::string process_type =
-      command_line->GetSwitchValueASCII(switches::kProcessType);
-
-  LOG(ERROR) << "process type " << process_type;
 
   if (!command_line->HasSwitch(switches::kUserDataDir)) {
     // first check the env
@@ -135,20 +110,44 @@ int main(int argc, const char* argv[]) {
 #endif
     PathService::Override(chrome::DIR_USER_DATA, user_data_dir);
   }
+}
 
 #if defined(OS_WIN)
-  MuonCrashReporterClient::InitCrashReporting();
-  SignalInitializeCrashReporting();
+int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, wchar_t* cmd, int) {
+  int argc = 0;
+  wchar_t** argv_setup = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
+  base::CommandLine::Init(0, nullptr);
+
+  install_static::InitializeFromPrimaryModule();
+#else  // OS_WIN
+#if defined(OS_MACOSX)
+int ChromeMain(int argc, const char* argv[]) {
+#else  // OS_MACOSX
+int main(int argc, const char* argv[]) {
+#endif
+  char** argv_setup = uv_setup_args(argc, const_cast<char**>(argv));
+  base::CommandLine::Init(argc, argv_setup);
+#endif  // OS_WIN
+  int64_t exe_entry_point_ticks = 0;
+  // const base::TimeTicks exe_entry_point_ticks = base::TimeTicks::Now();
+
+  const base::CommandLine* command_line =
+      base::CommandLine::ForCurrentProcess();
+
+  const std::string process_type =
+      command_line->GetSwitchValueASCII(switches::kProcessType);
+
+  LOG(ERROR) << "process type " << process_type;
+#if defined(OS_WIN)
+  if (process_type != crash_reporter::switches::kCrashpadHandler &&
+      process_type != crash_reporter::switches::kFallbackCrashHandler)
+    FixUserDataDir(command_line, process_type);
+#else
+  FixUserDataDir(command_line, process_type);
 #endif
 
-  // Initialize the CommandLine singleton from the environment.
-
-
 #if defined(OS_WIN)
-  // base::CommandLine::Init(0, nullptr);
-
-  // const std::string process_type =
-  //     command_line->GetSwitchValueASCII(switches::kProcessType);
+  SignalInitializeCrashReporting();
 
   // Confirm that an explicit prefetch profile is used for all process types
   // except for the browser process. Any new process type will have to assign
@@ -163,6 +162,8 @@ int main(int argc, const char* argv[]) {
         *base::CommandLine::ForCurrentProcess(), switches::kProcessType);
   } else if (process_type == crash_reporter::switches::kFallbackCrashHandler) {
     // return RunFallbackCrashHandler(*command_line);
+  } else {
+    MuonCrashReporterClient::InitCrashReporting();
   }
 
   // Signal Chrome Elf that Chrome has begun to start.
