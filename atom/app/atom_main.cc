@@ -35,18 +35,29 @@
 #include "chrome/install_static/install_details.h"
 #include "chrome/install_static/install_util.h"
 #include "chrome/install_static/product_install_details.h"
-#include "content/public/app/sandbox_helper_win.h"
-#include "sandbox/win/src/sandbox_types.h"
-
 #include "chrome_elf/chrome_elf_main.h"
+#include "chrome_elf/crash/crash_helper.h"
 #include "components/crash/content/app/crash_switches.h"
 #include "components/crash/content/app/crashpad.h"
 #include "components/crash/content/app/fallback_crash_handling_win.h"
 #include "components/crash/content/app/run_as_crashpad_handler_win.h"
-#include "content/public/common/result_codes.h"
-
-#include "chrome_elf/crash/crash_helper.h"
+#include "content/public/app/sandbox_helper_win.h"
 #include "muon/app/muon_crash_reporter_client.h"
+#include "sandbox/win/src/sandbox_types.h"
+
+bool HasValidWindowsPrefetchArgument(const base::CommandLine& command_line) {
+  const base::char16 kPrefetchArgumentPrefix[] = L"/prefetch:";
+
+  for (const auto& arg : command_line.argv()) {
+    if (arg.size() == arraysize(kPrefetchArgumentPrefix) &&
+        base::StartsWith(arg, kPrefetchArgumentPrefix,
+                         base::CompareCase::SENSITIVE)) {
+      return arg[arraysize(kPrefetchArgumentPrefix) - 1] >= L'1' &&
+             arg[arraysize(kPrefetchArgumentPrefix) - 1] <= L'8';
+    }
+  }
+  return false;
+}
 
 #endif  // defined(OS_WIN)
 
@@ -89,8 +100,6 @@ void FixUserDataDir(const base::CommandLine* command_line,
     }
   }
 
-  LOG(ERROR) << "user_data_dir 1 " << user_data_dir.value();
-
   if (user_data_dir.empty()) {
 #if defined(OS_WIN)
     chrome::GetDefaultRoamingUserDataDirectory(&user_data_dir);
@@ -100,8 +109,6 @@ void FixUserDataDir(const base::CommandLine* command_line,
     chrome::GetDefaultUserDataDirectory(&user_data_dir);
 #endif
   }
-
-  LOG(ERROR) << "user_data_dir 2 " << user_data_dir.value();
 
   if (!user_data_dir.empty()) {
 #if defined(OS_WIN)
@@ -137,7 +144,6 @@ int main(int argc, const char* argv[]) {
   const std::string process_type =
       command_line->GetSwitchValueASCII(switches::kProcessType);
 
-  LOG(ERROR) << "process type " << process_type;
 #if defined(OS_WIN)
   if (process_type != crash_reporter::switches::kCrashpadHandler &&
       process_type != crash_reporter::switches::kFallbackCrashHandler)
@@ -153,8 +159,8 @@ int main(int argc, const char* argv[]) {
   // except for the browser process. Any new process type will have to assign
   // itself a prefetch id. See kPrefetchArgument* constants in
   // content_switches.cc for details.
-  // DCHECK(process_type.empty() ||
-  //        HasValidWindowsPrefetchArgument(*command_line));
+  DCHECK(process_type.empty() ||
+         HasValidWindowsPrefetchArgument(*command_line));
 
   if (process_type == crash_reporter::switches::kCrashpadHandler) {
     crash_reporter::SetupFallbackCrashHandling(*command_line);
@@ -211,19 +217,7 @@ int main(int argc, const char* argv[]) {
   params.argc = argc;
   params.argv = argv;
   atom::AtomCommandLine::Init(argc, argv_setup);
-  // base::CommandLine::Init(params.argc, params.argv);
 #endif  // defined(OS_WIN)
-  // base::CommandLine::Init(0, nullptr);
-  // command_line = base::CommandLine::ForCurrentProcess();
-  // ALLOW_UNUSED_LOCAL(command_line);
-
-  // if (command_line->HasSwitch(switches::kHeadless)) {
-// #if defined(OS_MACOSX)
-//     SetUpBundleOverrides();
-// #endif
-    // return headless::HeadlessShellMain(params);
-  // }
-// #endif  // defined(OS_LINUX) || defined(OS_MACOSX) || defined(OS_WIN)
 
   int rv = content::ContentMain(params);
 

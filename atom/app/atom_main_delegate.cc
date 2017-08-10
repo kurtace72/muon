@@ -152,32 +152,24 @@ base::FilePath InitializeUserDataDir() {
   std::string process_type =
       command_line->GetSwitchValueASCII(::switches::kProcessType);
 
-//   // if (!process_type.empty()) {
-    wchar_t user_data_dir_buf[MAX_PATH], invalid_user_data_dir_buf[MAX_PATH];
+  wchar_t user_data_dir_buf[MAX_PATH], invalid_user_data_dir_buf[MAX_PATH];
 
-    using GetUserDataDirectoryThunkFunction =
-        void (*)(wchar_t*, size_t, wchar_t*, size_t);
-    HMODULE elf_module = GetModuleHandle(chrome::kChromeElfDllName);
-    if (elf_module) {
-      LOG(ERROR) << "elf module";
-      GetUserDataDirectoryThunkFunction get_user_data_directory_thunk =
-          reinterpret_cast<GetUserDataDirectoryThunkFunction>(
-              GetProcAddress(elf_module, "GetUserDataDirectoryThunk"));
-      get_user_data_directory_thunk(
-          user_data_dir_buf, arraysize(user_data_dir_buf),
-          invalid_user_data_dir_buf, arraysize(invalid_user_data_dir_buf));
-      base::FilePath local_user_data_dir = base::FilePath(user_data_dir_buf);
-      if (invalid_user_data_dir_buf[0] != 0) {
-      //   chrome::SetInvalidSpecifiedUserDataDir(
-      //       base::FilePath(invalid_user_data_dir_buf));
-        LOG(ERROR) << "invalid user data dir";
-        // command_line->AppendSwitchPath(switches::kUserDataDir, user_data_dir);
-      }
-      LOG(ERROR) << "elf module local_user_data_dir user data dir " << local_user_data_dir.AsUTF8Unsafe();
+  using GetUserDataDirectoryThunkFunction =
+      void (*)(wchar_t*, size_t, wchar_t*, size_t);
+  HMODULE elf_module = GetModuleHandle(chrome::kChromeElfDllName);
+  if (elf_module) {
+    GetUserDataDirectoryThunkFunction get_user_data_directory_thunk =
+        reinterpret_cast<GetUserDataDirectoryThunkFunction>(
+            GetProcAddress(elf_module, "GetUserDataDirectoryThunk"));
+    get_user_data_directory_thunk(
+        user_data_dir_buf, arraysize(user_data_dir_buf),
+        invalid_user_data_dir_buf, arraysize(invalid_user_data_dir_buf));
+    base::FilePath local_user_data_dir = base::FilePath(user_data_dir_buf);
+    if (invalid_user_data_dir_buf[0] == 0) {
       CHECK(PathService::OverrideAndCreateIfNeeded(base::DIR_LOCAL_APP_DATA,
-                                                   local_user_data_dir, false, true));
+          local_user_data_dir, false, true));
     }
-  // }
+  }
 #endif  // OS_WIN
 
   if (command_line->HasSwitch(switches::kUserDataDir)) {
@@ -234,7 +226,6 @@ base::FilePath InitializeUserDataDir() {
       native_messaging_dir, false, true);
 #endif  // defined(OS_POSIX)
 
-  LOG(ERROR) << "done";
   return user_data_dir;
 }
 
