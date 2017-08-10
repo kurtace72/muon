@@ -36,8 +36,6 @@
 #include "components/crash/content/app/crashpad.h"
 #endif
 
-// #include "chrome/common/chrome_result_codes.h"
-
 namespace {
 
 #if defined(OS_WIN)
@@ -78,25 +76,8 @@ void MuonCrashReporterClient::GetProductNameAndVersion(
 }
 #endif
 
-// #if defined(OS_WIN)
-// bool MuonCrashReporterClient::GetCrashDumpLocation(base::string16* crash_dir) {
-//   base::FilePath path;
-//   if (PathService::Get(chrome::DIR_CRASH_DUMPS, &path)) {
-//     *crash_dir = path.value();
-//     return true;
-//   }
-//   return false;
-// }
-// #elif defined(OS_MACOSX)
-// bool MuonCrashReporterClient::GetCrashDumpLocation(
-//     base::FilePath* crash_dir) {
-//   return PathService::Get(chrome::DIR_CRASH_DUMPS, crash_dir);
-// }
-// #endif
-
 #if defined(OS_WIN) || defined(OS_MACOSX)
 bool MuonCrashReporterClient::ShouldMonitorCrashHandlerExpensively() {
-  LOG(ERROR) << "should monitor crash handler expensivly??";
   return false;
 }
 
@@ -114,36 +95,12 @@ bool MuonCrashReporterClient::GetCollectStatsInSample() {
   return IsCrashReportingEnabled();
 }
 
-
-// static ChromeCrashReporterClient* instance = nullptr;
-// if (instance)
-//   return;
-
-// instance = new ChromeCrashReporterClient();
-// ANNOTATE_LEAKING_OBJECT_PTR(instance);
-
-// std::wstring process_type = install_static::GetSwitchValueFromCommandLine(
-//     ::GetCommandLine(), install_static::kProcessType);
-// // Don't set up Crashpad crash reporting in the Crashpad handler itself, nor
-// // in the fallback crash handler for the Crashpad handler process.
-// if (process_type != install_static::kCrashpadHandler &&
-//     process_type != install_static::kFallbackHandler) {
-//   crash_reporter::SetCrashReporterClient(instance);
-//   crash_reporter::InitializeCrashpadWithEmbeddedHandler(
-//       process_type.empty(), install_static::UTF16ToUTF8(process_type));
-// }
-
-
 //  static
 void MuonCrashReporterClient::InitCrashReporting() {
   static MuonCrashReporterClient* instance = nullptr;
 
-  LOG(ERROR) << "init crash reporting";
-
   if (instance)
     return;
-
-  LOG(ERROR) << "create instance";
 
   instance = new MuonCrashReporterClient();
   ANNOTATE_LEAKING_OBJECT_PTR(instance);
@@ -167,7 +124,6 @@ void MuonCrashReporterClient::InitCrashReporting() {
 #elif defined(OS_WIN)
   std::wstring process_type = install_static::GetSwitchValueFromCommandLine(
       ::GetCommandLine(), install_static::kProcessType);
-  LOG(ERROR) << "InitializeCrashpadWithEmbeddedHandler " << process_type;
   crash_reporter::InitializeCrashpadWithEmbeddedHandler(
       process_type.empty(), install_static::UTF16ToUTF8(process_type));
 #else
@@ -239,7 +195,6 @@ void MuonCrashReporterClient::SetCrashReportingEnabledForProcess(bool enabled) {
 void MuonCrashReporterClient::AppendExtraCommandLineSwitches(
     base::CommandLine* command_line) {
   if (IsCrashReportingEnabled()) {
-    LOG(ERROR) << "enable crash reporting for process";
     command_line->AppendSwitch(switches::kEnableCrashReporter);
   }
 }
@@ -252,7 +207,6 @@ void MuonCrashReporterClient::InitForProcess() {
       ::switches::kProcessType);
 
   if (process_type.empty()) {
-    LOG(ERROR) << "no init for browser process";
     return;
   }
 #if defined(OS_POSIX) && !defined(OS_MACOSX)
@@ -260,7 +214,6 @@ void MuonCrashReporterClient::InitForProcess() {
     return;
 #elif defined(OS_WIN)
   if (process_type == crash_reporter::switches::kCrashpadHandler) {
-    LOG(ERROR) << "crash handler process";
     return;
   }
 #endif
