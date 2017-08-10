@@ -172,8 +172,6 @@ base::FilePath InitializeUserDataDir() {
 #else  // OS_WIN
   user_data_dir =
       command_line.GetSwitchValuePath(switches::kUserDataDir);
-  std::string process_type =
-      command_line.GetSwitchValueASCII(switches::kProcessType);
 
   if (user_data_dir.empty()) {
     std::string user_data_dir_string;
@@ -189,6 +187,8 @@ base::FilePath InitializeUserDataDir() {
   if (user_data_dir.empty() ||
       !PathService::OverrideAndCreateIfNeeded(chrome::DIR_USER_DATA,
           user_data_dir, false, true)) {
+    std::string process_type =
+      command_line.GetSwitchValueASCII(switches::kProcessType);
     // The browser process (which is identified by an empty |process_type|) will
     // handle the error later; other processes that need the dir crash here.
     CHECK(process_type.empty()) << "Unable to get the user data directory "
@@ -197,6 +197,7 @@ base::FilePath InitializeUserDataDir() {
     LOG(ERROR) << "user data dir " << user_data_dir.MaybeAsASCII();
   }
 
+#if defined(OS_POSIX)
   // Setup NativeMessagingHosts to point to the default Chrome locations
   // because that's where native apps will create them
   base::FilePath chrome_user_data_dir;
@@ -206,11 +207,11 @@ base::FilePath InitializeUserDataDir() {
   chrome_user_data_dir = chrome_user_data_dir.Append("Google/Chrome");
   native_messaging_dir = base::FilePath(FILE_PATH_LITERAL(
       "/Library/Google/Chrome/NativeMessagingHosts"));
-#elif defined(OS_POSIX)
+#else
   chrome::GetDefaultUserDataDirectory(&chrome_user_data_dir);
   native_messaging_dir = base::FilePath(FILE_PATH_LITERAL(
       "/etc/opt/chrome/native-messaging-hosts"));
-#else
+#endif  // defined(OS_MACOSX)
   PathService::OverrideAndCreateIfNeeded(
       chrome::DIR_USER_NATIVE_MESSAGING,
       chrome_user_data_dir.Append(FILE_PATH_LITERAL("NativeMessagingHosts")),
