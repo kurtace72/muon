@@ -591,21 +591,18 @@ index 94cdc2aeb7398a433b9afcfbbcfa87dd1e57b65d..9263f1283ffe964eec8a479f7a1b7de6
  const base::FilePath::CharType kStatusTrayWindowClass[] =
      FPL("Chrome_StatusTrayWindow");
 diff --git a/chrome/common/chrome_paths_linux.cc b/chrome/common/chrome_paths_linux.cc
-index aa26cc9bbb90e53d727af4f3d55ee6472b766654..15940a09c4dfece70dae3527e1279c7cde8601fa 100644
+index aa26cc9bbb90e53d727af4f3d55ee6472b766654..b2bb03b44b117105a9bc1693fc6e79571b801396 100644
 --- a/chrome/common/chrome_paths_linux.cc
 +++ b/chrome/common/chrome_paths_linux.cc
-@@ -68,8 +68,10 @@ bool GetDefaultUserDataDirectory(base::FilePath* result) {
+@@ -66,7 +66,7 @@ bool GetDefaultUserDataDirectory(base::FilePath* result) {
+   base::FilePath config_dir(GetXDGDirectory(env.get(),
+                                             kXdgConfigHomeEnvVar,
                                              kDotConfigDir));
- #if defined(GOOGLE_CHROME_BUILD)
+-#if defined(GOOGLE_CHROME_BUILD)
++#if defined(GOOGLE_CHROME_BUILD) || !defined(MUON_CHROMIUM_BUILD)
    *result = config_dir.Append("google-chrome");
--#else
-+#elif defined(MUON_CHROMIUM_BUILD)
+ #else
    *result = config_dir.Append("chromium");
-+#else
-+  *result = config_dir.Append("brave");
- #endif
-   return true;
- }
 diff --git a/chrome/common/chrome_paths_mac.mm b/chrome/common/chrome_paths_mac.mm
 index d0bbbf72ff0e356e424dc280eeb1441c990b5770..8e96ea5706f87ea98ba55fcb583b16a8035fa903 100644
 --- a/chrome/common/chrome_paths_mac.mm
@@ -787,28 +784,21 @@ index b51284b707dba9393c1edbf7eff413e04bb57d40..358efde9a981136548054f54c7bb1639
    } else {
      sources += [
        "chromium_install_modes.cc",
-diff --git a/chrome/install_static/install_util.cc b/chrome/install_static/install_util.cc
-index 0d3054fa19022bf85eaccb95fbcb88343ec9cc51..a10c10619190d9c5e8ec2f404231fd55fa04d982 100644
---- a/chrome/install_static/install_util.cc
-+++ b/chrome/install_static/install_util.cc
-@@ -475,6 +475,7 @@ bool SetCollectStatsInSample(bool in_sample) {
- std::wstring& AppendChromeInstallSubDirectory(const InstallConstants& mode,
-                                               bool include_suffix,
-                                               std::wstring* path) {
-+#if defined(MUON_CHROMIUM_BUILD)
-   if (*kCompanyPathName) {
-     path->append(kCompanyPathName);
-     path->push_back(L'\\');
-@@ -483,6 +484,9 @@ std::wstring& AppendChromeInstallSubDirectory(const InstallConstants& mode,
-   if (!include_suffix)
-     return *path;
-   return path->append(mode.install_suffix);
-+#else
-+  return path->append(GetEnvironmentString16(L"MUON_USER_DATA_DIR_NAME"));
+diff --git a/chrome/install_static/user_data_dir.cc b/chrome/install_static/user_data_dir.cc
+index b5f779d03cfec8ce1db9354d85020acaa10c3a5b..26a2739f2ead09684bd7bc3d385321e9e31fb9ae 100644
+--- a/chrome/install_static/user_data_dir.cc
++++ b/chrome/install_static/user_data_dir.cc
+@@ -74,6 +74,10 @@ bool GetUserDataDirectoryUsingProcessCommandLine(
+ // Unify this with the Browser Distribution code.
+ bool GetDefaultUserDataDirectory(const InstallConstants& mode,
+                                  std::wstring* result) {
++#if !defined(MUON_CHROMIUM_BUILD)
++  result->Append(GetEnvironmentString16(L"CHROME_USER_DATA_DIR"));
++  return true;
 +#endif
- }
- 
- bool ReportingIsEnforcedByPolicy(bool* crash_reporting_enabled) {
+   // This environment variable should be set on Windows Vista and later
+   // (https://msdn.microsoft.com/library/windows/desktop/dd378457.aspx).
+   std::wstring user_data_dir = GetEnvironmentString16(L"LOCALAPPDATA");
 diff --git a/chrome/installer/util/prebuild/create_string_rc.py b/chrome/installer/util/prebuild/create_string_rc.py
 index ce885e05e62af97777314397c79d1f05aa0dc36a..c2b8a35bfdbd6a23ce288b2007dcb8ce7fee8657 100755
 --- a/chrome/installer/util/prebuild/create_string_rc.py
@@ -1078,6 +1068,19 @@ index 3bae07e14c690869515c4ce233988addad12f1c1..3ad9825f406bc10e21579cccb5677651
 +      std::string url = "https://brave-laptop-updates.herokuapp.com/1/crashes";
  #else
        std::string url;
+ #endif
+diff --git a/components/crash/content/app/crashpad_win.cc b/components/crash/content/app/crashpad_win.cc
+index 94a350f4b5a45481dd0fd88bf695ebc225301948..23ff5c579276d336aadf700265cd258e1778f301 100644
+--- a/components/crash/content/app/crashpad_win.cc
++++ b/components/crash/content/app/crashpad_win.cc
+@@ -79,6 +79,8 @@ base::FilePath PlatformCrashpadInitialization(bool initial_client,
+ 
+ #if defined(GOOGLE_CHROME_BUILD)
+     std::string url = "https://clients2.google.com/cr/report";
++#elif !defined(MUON_CHROMIUM_BUILD)
++    std::string url = "https://laptop-updates.brave.com/1/crashes";
+ #else
+     std::string url;
  #endif
 diff --git a/components/crash/core/browser/resources/crashes.js b/components/crash/core/browser/resources/crashes.js
 index dbd2ae8df59756c61d28091cff70098c897db8f4..84fbc695c817c87deb902d8b6f69d3f1ec762ccb 100644
@@ -1698,24 +1701,22 @@ index a00cfa0a95f16e18757bd32b899d7a2eda700993..4608dc001172934658f92a1c6e328f23
  void PrintWebViewHelper::RenderPage(const PrintMsg_Print_Params& params,
                                      int page_number,
 diff --git a/content/app/content_main_runner.cc b/content/app/content_main_runner.cc
-index a677c9d2c6df30e78614b09d396372db33dff781..47edb643c0507958134edb146ac1b56474f714a7 100644
+index a677c9d2c6df30e78614b09d396372db33dff781..897807eab288d2a737e0c3183bbe7a468e68311b 100644
 --- a/content/app/content_main_runner.cc
 +++ b/content/app/content_main_runner.cc
-@@ -624,7 +624,7 @@ class ContentMainRunnerImpl : public ContentMainRunner {
+@@ -624,7 +624,6 @@ class ContentMainRunnerImpl : public ContentMainRunner {
  
      InitializeV8IfNeeded(command_line, process_type);
  
 -#if !defined(OFFICIAL_BUILD)
-+#if 0
  #if defined(OS_WIN)
      bool should_enable_stack_dump = !process_type.empty();
  #else
-@@ -640,7 +640,7 @@ class ContentMainRunnerImpl : public ContentMainRunner {
+@@ -640,7 +639,6 @@ class ContentMainRunnerImpl : public ContentMainRunner {
              service_manager::switches::kDisableInProcessStackTraces)) {
        base::debug::EnableInProcessStackDumping();
      }
 -#endif  // !defined(OFFICIAL_BUILD)
-+#endif  // 0
  
      if (delegate_)
        delegate_->PreSandboxStartup();

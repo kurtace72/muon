@@ -143,89 +143,81 @@ void InitLogging(const std::string& process_type) {
 }
 
 base::FilePath InitializeUserDataDir() {
-  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
   base::FilePath user_data_dir;
-
-  PathService::Get(chrome::DIR_USER_DATA, &user_data_dir);
-
 #if defined(OS_WIN)
-  std::string process_type =
-      command_line->GetSwitchValueASCII(::switches::kProcessType);
-
   wchar_t user_data_dir_buf[MAX_PATH], invalid_user_data_dir_buf[MAX_PATH];
 
   using GetUserDataDirectoryThunkFunction =
       void (*)(wchar_t*, size_t, wchar_t*, size_t);
   HMODULE elf_module = GetModuleHandle(chrome::kChromeElfDllName);
   if (elf_module) {
+    // If we're in a test, chrome_elf won't be loaded.
     GetUserDataDirectoryThunkFunction get_user_data_directory_thunk =
         reinterpret_cast<GetUserDataDirectoryThunkFunction>(
             GetProcAddress(elf_module, "GetUserDataDirectoryThunk"));
     get_user_data_directory_thunk(
         user_data_dir_buf, arraysize(user_data_dir_buf),
         invalid_user_data_dir_buf, arraysize(invalid_user_data_dir_buf));
-    base::FilePath local_user_data_dir = base::FilePath(user_data_dir_buf);
-    if (invalid_user_data_dir_buf[0] == 0) {
-      CHECK(PathService::OverrideAndCreateIfNeeded(base::DIR_LOCAL_APP_DATA,
-          local_user_data_dir, false, true));
+    if (invalid_user_data_dir_buf[0] == 0)
+      user_data_dir = base::FilePath(user_data_dir_buf);
+  } else {
+    // In tests, just respect the flag if given.
+    user_data_dir =
+        command_line.GetSwitchValuePath(switches::kUserDataDir);
+    if (!user_data_dir.empty() && user_data_dir.EndsWithSeparator())
+      user_data_dir = user_data_dir.StripTrailingSeparators();
+  }
+#else  // OS_WIN
+  user_data_dir =
+      command_line.GetSwitchValuePath(switches::kUserDataDir);
+  std::string process_type =
+      command_line.GetSwitchValueASCII(switches::kProcessType);
+
+  if (user_data_dir.empty()) {
+    std::string user_data_dir_string;
+    std::unique_ptr<base::Environment> environment(base::Environment::Create());
+    if (environment->GetVar("CHROME_USER_DATA_DIR", &user_data_dir_string) &&
+        base::IsStringUTF8(user_data_dir_string)) {
+      user_data_dir = base::FilePath::FromUTF8Unsafe(user_data_dir_string);
     }
   }
 #endif  // OS_WIN
 
-  if (command_line->HasSwitch(switches::kUserDataDir)) {
-    user_data_dir = command_line->GetSwitchValuePath(switches::kUserDataDir);
+  // Warn and fail early if the process fails to get a user data directory.
+  if (user_data_dir.empty() ||
+      !PathService::OverrideAndCreateIfNeeded(chrome::DIR_USER_DATA,
+          user_data_dir, false, true)) {
+    // The browser process (which is identified by an empty |process_type|) will
+    // handle the error later; other processes that need the dir crash here.
+    CHECK(process_type.empty()) << "Unable to get the user data directory "
+                                << "for process type: " << process_type;
+  } else {
+    LOG(ERROR) << "user data dir " << user_data_dir.MaybeAsASCII();
   }
-
-  // On Windows, trailing separators leave Chrome in a bad state.
-  // See crbug.com/464616.
-  if (user_data_dir.EndsWithSeparator())
-    user_data_dir = user_data_dir.StripTrailingSeparators();
-
-  if (user_data_dir.empty())
-#if defined(OS_WIN)
-    chrome::GetDefaultRoamingUserDataDirectory(&user_data_dir);
-    // get rid of kUserDataDirname
-    user_data_dir = user_data_dir.DirName();
-#else
-    chrome::GetDefaultUserDataDirectory(&user_data_dir);
-#endif
-
-  PathService::OverrideAndCreateIfNeeded(chrome::DIR_USER_DATA, user_data_dir,
-      false, true);
 
   // Setup NativeMessagingHosts to point to the default Chrome locations
   // because that's where native apps will create them
-#if defined(OS_POSIX)
-  base::FilePath default_user_data_dir;
-  // this is the chrome path so don't use roaming for win
-  chrome::GetDefaultUserDataDirectory(&default_user_data_dir);
-  std::vector<base::FilePath::StringType> components;
-  default_user_data_dir.GetComponents(&components);
-  // remove "brave"
-  components.pop_back();
-  base::FilePath chrome_user_data_dir(FILE_PATH_LITERAL("/"));
-  for (std::vector<base::FilePath::StringType>::iterator i =
-           components.begin() + 1; i != components.end(); ++i) {
-    chrome_user_data_dir = chrome_user_data_dir.Append(*i);
-  }
+  base::FilePath chrome_user_data_dir;
+  base::FilePath native_messaging_dir;
+#if defined(OS_MACOSX)
+  PathService::Get(base::DIR_APP_DATA, &chrome_user_data_dir);
   chrome_user_data_dir = chrome_user_data_dir.Append("Google/Chrome");
+  native_messaging_dir = base::FilePath(FILE_PATH_LITERAL(
+      "/Library/Google/Chrome/NativeMessagingHosts"));
+#elif defined(OS_POSIX)
+  chrome::GetDefaultUserDataDirectory(&chrome_user_data_dir);
+  native_messaging_dir = base::FilePath(FILE_PATH_LITERAL(
+      "/etc/opt/chrome/native-messaging-hosts"));
+#else
   PathService::OverrideAndCreateIfNeeded(
       chrome::DIR_USER_NATIVE_MESSAGING,
       chrome_user_data_dir.Append(FILE_PATH_LITERAL("NativeMessagingHosts")),
       false, true);
-
-  base::FilePath native_messaging_dir;
-#if defined(OS_MACOSX)
-  native_messaging_dir = base::FilePath(FILE_PATH_LITERAL(
-      "/Library/Google/Chrome/NativeMessagingHosts"));
-#else
-  native_messaging_dir = base::FilePath(FILE_PATH_LITERAL(
-      "/etc/opt/chrome/native-messaging-hosts"));
-#endif  // !defined(OS_MACOSX)
   PathService::OverrideAndCreateIfNeeded(chrome::DIR_NATIVE_MESSAGING,
       native_messaging_dir, false, true);
-#endif  // defined(OS_POSIX)
-
+#endif  // OS_POSIX
   return user_data_dir;
 }
 

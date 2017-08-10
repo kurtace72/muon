@@ -201,7 +201,6 @@ void MuonCrashReporterClient::AppendExtraCommandLineSwitches(
 
 //  static
 void MuonCrashReporterClient::InitForProcess() {
-  LOG(ERROR) << "InitFOrProcess";
   auto command_line = base::CommandLine::ForCurrentProcess();
   std::string process_type = command_line->GetSwitchValueASCII(
       ::switches::kProcessType);
